@@ -1,5 +1,5 @@
 use winit::{
-	event::{Event, WindowEvent},
+	event::{Event, WindowEvent, StartCause},
 	event_loop::{EventLoop, ControlFlow},
 	window::{WindowBuilder, WindowLevel},
 };
@@ -20,6 +20,7 @@ async fn main() -> anyhow::Result<()> {
 		// .with_transparent(true) // Doesn't work
 		// .with_decorations(false)
 		.with_window_level(WindowLevel::AlwaysOnTop)
+		.with_visible(false)
 		.build(&event_loop)?;
 
 	let window = Arc::new(window);
@@ -39,6 +40,8 @@ async fn main() -> anyhow::Result<()> {
 	// 	SetLayeredWindowAttributes(hwnd, COLORREF(0), ((255 * 30) / 100) as u8, LWA_ALPHA)?;
 	// }
 
+	println!("window created");
+
 	// create an instance
 	let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
 		// backends: wgpu::Backends::all().difference(wgpu::Backends::VULKAN),
@@ -48,6 +51,8 @@ async fn main() -> anyhow::Result<()> {
 
 	// create an surface
 	let surface = instance.create_surface(window.clone())?;
+
+	println!("surface created");
 
 	// for adapter in instance.enumerate_adapters(wgpu::Backends::all()) {
 	// 	dbg!(adapter.get_info(), surface.get_capabilities(&adapter).alpha_modes);
@@ -63,6 +68,7 @@ async fn main() -> anyhow::Result<()> {
 			anyhow::bail!("Failed to request adapter")
 		};
 
+	println!("adapter created");
 
 	// // create a device and a queue
 	let (device, queue) = adapter.request_device(
@@ -75,13 +81,49 @@ async fn main() -> anyhow::Result<()> {
 	)
 	.await?;
 
+	println!("device created");
+
 	let size = window.inner_size();
 	let mut config = surface.get_default_config(&adapter, size.width, size.height).ok_or_else(|| anyhow::format_err!("Failed to get surface config"))?;
 	// config.alpha_mode = wgpu::CompositeAlphaMode::PreMultiplied;
 	surface.configure(&device, &config);
 
+	println!("surface configured");
+
 	event_loop.run(move |event, target| {
 		target.set_control_flow(ControlFlow::Poll);
+
+		// Initial present/show window
+		if let Event::NewEvents(StartCause::Init) = event {
+			let current_frame_surface_texture = surface.get_current_texture().unwrap();
+			let current_frame_view = current_frame_surface_texture.texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+			let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+
+			{
+				let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+					label: None,
+					color_attachments: &[Some(
+						wgpu::RenderPassColorAttachment {
+							view: &current_frame_view,
+							resolve_target: None,
+							ops: wgpu::Operations {
+								load: wgpu::LoadOp::Clear(wgpu::Color::RED),
+								store: wgpu::StoreOp::Store,
+							},
+						}
+					)],
+					depth_stencil_attachment: None,
+					timestamp_writes: None,
+					occlusion_query_set: None,
+				});
+			}
+
+			queue.submit(Some(encoder.finish()));
+			current_frame_surface_texture.present();
+
+			window.set_visible(true);
+		}
 
 		if let Event::WindowEvent { window_id, event } = event {
 			match event {
