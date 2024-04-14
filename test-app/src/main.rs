@@ -57,26 +57,12 @@ async fn main() -> anyhow::Result<()> {
 
 	use lyon::path::math::{point};
 
-	let mut builder = Path::builder();
-	builder.begin(point(-7.0, 0.0));
-	builder.line_to(point(-7.0, 7.0));
-	builder.line_to(point(0.0, 7.0));
-	builder.quadratic_bezier_to(point(7.0, 7.0), point(7.0, 0.0));
-	builder.end(false);
 
-	let path = builder.build();
+	let mut time = 0.0f32;
 
-	painter.fill_path(&path, [0.3, 0.2, 0.9]);
-	painter.stroke_path(&path, [0.3, 1.0, 0.6]);
-
-	painter.fill_circle(Vec2::zero(), 5.0, [1.0, 0.5, 1.0]);
-	painter.circle(Vec2::zero(), 5.0, [0.3, 0.1, 0.35]);
-
-	painter.rect(Aabb2::around_point(Vec2::zero(), Vec2::new(9.0, 9.0)), [1.0, 1.0, 1.0]);
+	event_loop.set_control_flow(ControlFlow::Wait);
 
 	event_loop.run(move |event, target| {
-		// target.set_control_flow(ControlFlow::Wait);
-		target.set_control_flow(ControlFlow::Poll);
 
 		// Initial present/show window
 		if let Event::NewEvents(StartCause::Init) = event {
@@ -91,10 +77,33 @@ async fn main() -> anyhow::Result<()> {
 		if let Event::WindowEvent { window_id, event } = event {
 			match event {
 				WindowEvent::RedrawRequested => {
+					let mut builder = Path::builder();
+					builder.begin(point(-7.0, 0.0));
+					builder.line_to(point(-7.0, 7.0));
+					builder.line_to(point(0.0, 7.0));
+					builder.quadratic_bezier_to(point(7.0, 7.0), point(7.0, 0.0));
+					builder.end(false);
+
+					let path = builder.build();
+
+					painter.clear();
+					painter.fill_path(&path, [0.3, 0.2, 0.9]);
+					painter.stroke_path(&path, [0.3, 1.0, 0.6]);
+
+					painter.fill_circle(Vec2::zero(), 5.0, [1.0, 0.5, 1.0]);
+					painter.circle(Vec2::from_y(time.sin()*5.0), 5.0, [0.3, 0.1, 0.35]);
+
+					painter.rect(Aabb2::around_point(Vec2::zero(), Vec2::new(9.0, 9.0)), [1.0, 1.0, 1.0]);
+
+
 					renderer.prepare(&painter);
 
 					window.pre_present_notify();
 					renderer.present();
+
+					window.request_redraw();
+
+					time += 1.0/60.0;
 				}
 				
 				WindowEvent::Resized(new_size) => {
