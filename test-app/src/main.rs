@@ -6,6 +6,13 @@ use winit::{
 
 use std::sync::Arc;
 
+use wgpu::util::DeviceExt;
+
+use lyon::tessellation::*;
+use lyon::tessellation::geometry_builder::*;
+
+use common::*;
+
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -43,20 +50,12 @@ async fn main() -> anyhow::Result<()> {
 	println!("window created");
 
 	// create an instance
-	let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-		// backends: wgpu::Backends::all().difference(wgpu::Backends::VULKAN),
-		// backends: wgpu::Backends::GL,
-		.. wgpu::InstanceDescriptor::default()
-	});
+	let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::default());
 
 	// create an surface
 	let surface = instance.create_surface(window.clone())?;
 
 	println!("surface created");
-
-	// for adapter in instance.enumerate_adapters(wgpu::Backends::all()) {
-	// 	dbg!(adapter.get_info(), surface.get_capabilities(&adapter).alpha_modes);
-	// }
 
 	// create an adapter
 	let Some(adapter) = instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -70,7 +69,7 @@ async fn main() -> anyhow::Result<()> {
 
 	println!("adapter created");
 
-	// // create a device and a queue
+	// create a device and a queue
 	let (device, queue) = adapter.request_device(
 		&wgpu::DeviceDescriptor {
 			label: None,
@@ -85,30 +84,179 @@ async fn main() -> anyhow::Result<()> {
 
 	let size = window.inner_size();
 	let mut config = surface.get_default_config(&adapter, size.width, size.height).ok_or_else(|| anyhow::format_err!("Failed to get surface config"))?;
-	// config.alpha_mode = wgpu::CompositeAlphaMode::PreMultiplied;
+	config.present_mode = wgpu::PresentMode::AutoVsync;
 	surface.configure(&device, &config);
 
 	println!("surface configured");
 
+
+
+	// Create tessellated shape
+	let mut painter = Painter::new();
+
+	let mut builder = Path::builder(); //.with_svg();
+	// lyon::extra::rust_logo::build_logo_path(&mut builder);
+
+	use lyon::path::math::{point};
+
+	builder.begin(point(-7.0, 0.0));
+	builder.line_to(point(-7.0, 7.0));
+	builder.line_to(point(0.0, 7.0));
+	builder.quadratic_bezier_to(point(8.0, 8.0), point(7.0, 0.0));
+	builder.end(false);
+
+	let path = builder.build();
+
+	painter.fill_path(&path, [0.3, 0.2, 0.9]);
+	painter.stroke_path(&path, [0.3, 1.0, 0.6]);
+
+	painter.fill_circle(Vec2::zero(), 5.0, [1.0, 0.5, 1.0]);
+	painter.circle(Vec2::zero(), 5.0, [0.3, 0.1, 0.35]);
+
+	painter.rect(Aabb2::around_point(Vec2::zero(), Vec2::new(9.0, 9.0)), [1.0, 1.0, 1.0]);
+
+	// Create buffers
+	let vbo = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+		label: None,
+		contents: bytemuck::cast_slice(&painter.geometry.vertices),
+		usage: wgpu::BufferUsages::VERTEX,
+	});
+
+	let ibo = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+		label: None,
+		contents: bytemuck::cast_slice(&painter.geometry.indices),
+		usage: wgpu::BufferUsages::INDEX,
+	});
+
+	let fill_range = 0..(painter.geometry.indices.len() as u32);
+
+	let globals_buffer_byte_size = std::mem::size_of::<Globals>() as u64;
+	let globals_ubo = device.create_buffer(&wgpu::BufferDescriptor {
+		label: Some("Globals ubo"),
+		size: globals_buffer_byte_size,
+		usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+		mapped_at_creation: false,
+	});
+
+
+	// Set up shader pipeline
+	let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+		label: None,
+		source: wgpu::ShaderSource::Wgsl(include_str!("shaders.wgsl").into()),
+	});
+	
+	let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+		label: Some("Bind group layout"),
+		entries: &[
+			wgpu::BindGroupLayoutEntry {
+				binding: 0,
+				visibility: wgpu::ShaderStages::VERTEX,
+				ty: wgpu::BindingType::Buffer {
+					ty: wgpu::BufferBindingType::Uniform,
+					has_dynamic_offset: false,
+					min_binding_size: wgpu::BufferSize::new(globals_buffer_byte_size),
+				},
+				count: None,
+			},
+		],
+	});
+
+	let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+		label: Some("Bind group"),
+		layout: &bind_group_layout,
+		entries: &[
+			wgpu::BindGroupEntry {
+				binding: 0,
+				resource: wgpu::BindingResource::Buffer(globals_ubo.as_entire_buffer_binding()),
+			},
+		],
+	});
+
+	let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+		label: None,
+		bind_group_layouts: &[&bind_group_layout],
+		push_constant_ranges: &[],
+	});
+
+	let swapchain_capabilities = surface.get_capabilities(&adapter);
+	let swapchain_format = swapchain_capabilities.formats[0];
+
+	let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+		label: None,
+		layout: Some(&pipeline_layout),
+		vertex: wgpu::VertexState {
+			module: &shader,
+			entry_point: "vs_main",
+			buffers: &[wgpu::VertexBufferLayout {
+				array_stride: std::mem::size_of::<Vertex>() as u64,
+				step_mode: wgpu::VertexStepMode::Vertex,
+				attributes: &[
+					wgpu::VertexAttribute {
+						offset: 0,
+						format: wgpu::VertexFormat::Float32x2,
+						shader_location: 0,
+					},
+					wgpu::VertexAttribute {
+						offset: 8,
+						format: wgpu::VertexFormat::Float32x4,
+						shader_location: 1,
+					},
+				],
+			}],
+		},
+		fragment: Some(wgpu::FragmentState {
+			module: &shader,
+			entry_point: "fs_main",
+			targets: &[Some(wgpu::ColorTargetState {
+				format: swapchain_format,
+				write_mask: wgpu::ColorWrites::all(),
+				blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+			})],
+		}),
+		primitive: wgpu::PrimitiveState {
+			topology: wgpu::PrimitiveTopology::TriangleList,
+			polygon_mode: wgpu::PolygonMode::Fill,
+			front_face: wgpu::FrontFace::Ccw,
+			strip_index_format: None,
+			cull_mode: Some(wgpu::Face::Back),
+			conservative: false,
+			unclipped_depth: false,
+		},
+		depth_stencil: None,
+		multisample: wgpu::MultisampleState::default(),
+		multiview: None,
+	});
+
+	queue.write_buffer(&globals_ubo, 0, bytemuck::cast_slice(&[
+		Globals {
+			row_x: [ 0.01, 0.0, 0.0,-0.5],
+			row_y: [ 0.0,-0.01, 0.0, 0.5],
+		}
+	]));
+
 	event_loop.run(move |event, target| {
-		target.set_control_flow(ControlFlow::Poll);
+		let _ = (&instance, &adapter, &shader, &pipeline_layout);
+
+		target.set_control_flow(ControlFlow::Wait);
+		// target.set_control_flow(ControlFlow::Poll);
 
 		// Initial present/show window
 		if let Event::NewEvents(StartCause::Init) = event {
 			let current_frame_surface_texture = surface.get_current_texture().unwrap();
 			let current_frame_view = current_frame_surface_texture.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
+
 			let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
 			{
-				let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+				let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 					label: None,
 					color_attachments: &[Some(
 						wgpu::RenderPassColorAttachment {
 							view: &current_frame_view,
 							resolve_target: None,
 							ops: wgpu::Operations {
-								load: wgpu::LoadOp::Clear(wgpu::Color::RED),
+								load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
 								store: wgpu::StoreOp::Store,
 							},
 						}
@@ -117,9 +265,17 @@ async fn main() -> anyhow::Result<()> {
 					timestamp_writes: None,
 					occlusion_query_set: None,
 				});
+
+				pass.set_pipeline(&render_pipeline);
+				pass.set_bind_group(0, &bind_group, &[]);
+				pass.set_index_buffer(ibo.slice(..), wgpu::IndexFormat::Uint32);
+				pass.set_vertex_buffer(0, vbo.slice(..));
+				pass.draw_indexed(fill_range.clone(), 0, 0..1);
 			}
 
 			queue.submit(Some(encoder.finish()));
+
+			window.pre_present_notify();
 			current_frame_surface_texture.present();
 
 			window.set_visible(true);
@@ -135,17 +291,26 @@ async fn main() -> anyhow::Result<()> {
 					let current_frame_surface_texture = surface.get_current_texture().unwrap();
 					let current_frame_view = current_frame_surface_texture.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
+					let aspect = config.width as f32 / config.height as f32;
+					let scale = 0.01;
+					queue.write_buffer(&globals_ubo, 0, bytemuck::cast_slice(&[
+						Globals {
+							row_x: [ scale/aspect, 0.0, 0.0,  0.0],
+							row_y: [         0.0, scale, 0.0, 0.0],
+						}
+					]));
+
 					let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
 					{
-						let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+						let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 							label: None,
 							color_attachments: &[Some(
 								wgpu::RenderPassColorAttachment {
 									view: &current_frame_view,
 									resolve_target: None,
 									ops: wgpu::Operations {
-										load: wgpu::LoadOp::Clear(wgpu::Color::RED),
+										load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
 										store: wgpu::StoreOp::Store,
 									},
 								}
@@ -154,10 +319,21 @@ async fn main() -> anyhow::Result<()> {
 							timestamp_writes: None,
 							occlusion_query_set: None,
 						});
+
+						pass.set_viewport(0.0, 0.0, config.width as f32, config.height as f32, 0.0, 1.0);
+						pass.set_pipeline(&render_pipeline);
+						pass.set_bind_group(0, &bind_group, &[]);
+						pass.set_index_buffer(ibo.slice(..), wgpu::IndexFormat::Uint32);
+						pass.set_vertex_buffer(0, vbo.slice(..));
+						pass.draw_indexed(fill_range.clone(), 0, 0..1);
 					}
 
 					queue.submit(Some(encoder.finish()));
+
+					window.pre_present_notify();
 					current_frame_surface_texture.present();
+
+					// window.request_redraw();
 				}
 				
 				WindowEvent::Resized(new_size) => {
@@ -179,4 +355,130 @@ async fn main() -> anyhow::Result<()> {
 		}
 	})
 	.map_err(Into::into)
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+struct Vertex {
+	pos: [f32; 2],
+	color: [f32; 4],
+}
+
+unsafe impl bytemuck::Pod for Vertex {}
+unsafe impl bytemuck::Zeroable for Vertex {}
+
+struct VertexConstructor {
+	// transform: usvg::Transform,
+	// color: epaint::Color32,
+	color: [f32; 4],
+
+}
+
+impl FillVertexConstructor<Vertex> for VertexConstructor {
+	fn new_vertex(&mut self, vertex: FillVertex) -> Vertex {
+		let pos = vertex.position().to_array();
+		Vertex {
+			pos,
+			color: self.color,
+		}
+	}
+}
+
+impl StrokeVertexConstructor<Vertex> for VertexConstructor {
+	fn new_vertex(&mut self, vertex: StrokeVertex) -> Vertex {
+		let pos = vertex.position().to_array();
+		Vertex {
+			pos,
+			color: self.color,
+		}
+	}
+}
+
+
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+struct Globals {
+	row_x: [f32; 4],
+	row_y: [f32; 4],
+}
+
+unsafe impl bytemuck::Pod for Globals {}
+unsafe impl bytemuck::Zeroable for Globals {}
+
+
+
+pub struct Painter {
+	geometry: VertexBuffers<Vertex, u32>,
+	fill_tess: FillTessellator,
+	stroke_tess: StrokeTessellator,
+
+	fill_options: FillOptions,
+	stroke_options: StrokeOptions,
+}
+
+impl Painter {
+	pub fn new() -> Painter {
+		Painter {
+			geometry: VertexBuffers::new(),
+			fill_tess: FillTessellator::new(),
+			stroke_tess: StrokeTessellator::new(),
+
+			fill_options: FillOptions::tolerance(0.02).with_fill_rule(FillRule::NonZero),
+			stroke_options: StrokeOptions::DEFAULT,
+		}
+	}
+
+	pub fn clear(&mut self) {
+		self.geometry.vertices.clear();
+		self.geometry.indices.clear();
+	}
+
+	fn geo_builder<'g>(geo: &'g mut VertexBuffers<Vertex, u32>, color: impl Into<Color>) -> (impl StrokeGeometryBuilder + FillGeometryBuilder + 'g) {
+		let color = color.into().to_array();
+		BuffersBuilder::new(geo, VertexConstructor { color }).with_inverted_winding()
+	}
+}
+
+use lyon::math::{Point, Box2D};
+use lyon::path::{Path, PathSlice};
+use lyon::tessellation::*;
+use lyon::tessellation::geometry_builder::*;
+
+fn to_point(Vec2{x,y}: Vec2) -> Point {
+	Point::new(x, y)
+}
+
+fn to_box(Aabb2{min, max}: Aabb2) -> Box2D {
+	Box2D::new(to_point(min), to_point(max))
+}
+
+impl Painter {
+	pub fn circle(&mut self, pos: impl Into<Vec2>, r: f32, color: impl Into<Color>) {
+		let pos = to_point(pos.into());
+		self.stroke_tess.tessellate_circle(pos, r, &self.stroke_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+	}
+
+	pub fn fill_circle(&mut self, pos: impl Into<Vec2>, r: f32, color: impl Into<Color>) {
+		let pos = to_point(pos.into());
+		self.fill_tess.tessellate_circle(pos, r, &self.fill_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+	}
+
+	pub fn rect(&mut self, rect: impl Into<Aabb2>, color: impl Into<Color>) {
+		let rect = to_box(rect.into());
+		self.stroke_tess.tessellate_rectangle(&rect, &self.stroke_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+	}
+
+	pub fn fill_rect(&mut self, rect: impl Into<Aabb2>, color: impl Into<Color>) {
+		let rect = to_box(rect.into());
+		self.fill_tess.tessellate_rectangle(&rect, &self.fill_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+	}
+
+	pub fn stroke_path(&mut self, path: &Path, color: impl Into<Color>) {
+		self.stroke_tess.tessellate_path(path, &self.stroke_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+	}
+
+	pub fn fill_path(&mut self, path: &Path, color: impl Into<Color>) {
+		self.fill_tess.tessellate_path(path, &self.fill_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+	}
 }
