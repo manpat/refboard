@@ -21,16 +21,20 @@ async fn main() -> anyhow::Result<()> {
 	// use winit::platform::windows::WindowBuilderExtWindows;
 
 	let event_loop = EventLoop::new()?;
-	let window = WindowBuilder::new()
+	let mut window_builder = WindowBuilder::new()
 		.with_title("refboard")
 		.with_resizable(true)
 		// .with_transparent(true) // Doesn't work
 		// .with_decorations(false)
 		.with_window_level(WindowLevel::AlwaysOnTop)
-		.with_visible(false)
-		.build(&event_loop)?;
+		.with_visible(false);
 
-	let window = Arc::new(window);
+	// #[cfg(windows)] {
+	// 	use winit::platform::windows::WindowBuilderExtWindows;
+	// 	window_builder = window_builder.with_no_redirection_bitmap(true);
+	// }
+
+	let window = Arc::new(window_builder.build(&event_loop)?);
 
 	// #[cfg(windows)]
 	// unsafe {
@@ -108,8 +112,6 @@ async fn main() -> anyhow::Result<()> {
 				
 				WindowEvent::Resized(new_size) => {
 					renderer.resize(new_size.width, new_size.height);
-					renderer.prepare(&painter);
-					renderer.present();
 				}
 
 				WindowEvent::CloseRequested => {
@@ -258,6 +260,8 @@ pub struct Renderer {
 	surface: wgpu::Surface<'static>,
 	surface_config: wgpu::SurfaceConfiguration,
 
+	framebuffer: wgpu::TextureView,
+
 	globals_buffer: wgpu::Buffer,
 	vector_bind_group: wgpu::BindGroup,
 	vector_render_pipeline: wgpu::RenderPipeline,
@@ -307,7 +311,8 @@ impl Renderer {
 		println!("device created");
 
 		let mut surface_config = surface.get_default_config(&adapter, size.width, size.height).ok_or_else(|| anyhow::format_err!("Failed to get surface config"))?;
-		surface_config.present_mode = wgpu::PresentMode::AutoVsync;
+		// surface_config.present_mode = wgpu::PresentMode::AutoVsync;
+		surface_config.present_mode = wgpu::PresentMode::Fifo;
 		surface.configure(&device, &surface_config);
 
 		println!("surface configured");
@@ -351,7 +356,7 @@ impl Renderer {
 				buffers: &[wgpu::VertexBufferLayout {
 					array_stride: std::mem::size_of::<Vertex>() as u64,
 					step_mode: wgpu::VertexStepMode::Vertex,
-					attributes: &[
+					attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x4], /*&[
 						wgpu::VertexAttribute {
 							offset: 0,
 							format: wgpu::VertexFormat::Float32x2,
@@ -362,7 +367,7 @@ impl Renderer {
 							format: wgpu::VertexFormat::Float32x4,
 							shader_location: 1,
 						},
-					],
+					],*/
 				}],
 			},
 			fragment: Some(wgpu::FragmentState {
@@ -384,7 +389,10 @@ impl Renderer {
 				unclipped_depth: false,
 			},
 			depth_stencil: None,
-			multisample: wgpu::MultisampleState::default(),
+			multisample: wgpu::MultisampleState {
+				count: 4,
+				.. wgpu::MultisampleState::default()
+			},
 			multiview: None,
 		});
 
@@ -420,6 +428,8 @@ impl Renderer {
 			],
 		});
 
+		let framebuffer = Self::create_framebuffer(&device, &surface_config, 4);
+
 		Ok(Renderer {
 			device,
 			queue,
@@ -430,6 +440,8 @@ impl Renderer {
 			vector_bind_group,
 			vector_render_pipeline,
 
+			framebuffer,
+
 			vertex_buffer,
 			index_buffer,
 
@@ -438,12 +450,36 @@ impl Renderer {
 		})
 	}
 
+	fn create_framebuffer(device: &wgpu::Device, surface_conf: &wgpu::SurfaceConfiguration, sample_count: u32) -> wgpu::TextureView {
+		let multisampled_texture_extent = wgpu::Extent3d {
+			width: surface_conf.width,
+			height: surface_conf.height,
+			depth_or_array_layers: 1,
+		};
+
+		let multisampled_frame_descriptor = &wgpu::TextureDescriptor {
+			label: None,
+			size: multisampled_texture_extent,
+			mip_level_count: 1,
+			sample_count,
+			dimension: wgpu::TextureDimension::D2,
+			format: surface_conf.format,
+			usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+			view_formats: &[],
+		};
+
+		device
+			.create_texture(multisampled_frame_descriptor)
+			.create_view(&wgpu::TextureViewDescriptor::default())
+	}
+
 	pub fn resize(&mut self, new_width: u32, new_height: u32) {
-		self.surface_config.width = new_width;
-		self.surface_config.height = new_height;
+		self.surface_config.width = new_width.max(1);
+		self.surface_config.height = new_height.max(1);
 
 		if new_width > 0 && new_height > 0 {
 			self.surface.configure(&self.device, &self.surface_config);
+			self.framebuffer = Self::create_framebuffer(&self.device, &self.surface_config, 4);
 		}
 	}
 
@@ -470,12 +506,20 @@ impl Renderer {
 		]));
 	}
 
-	pub fn present(&self) {
+	pub fn present(&mut self) {
 		if self.surface_config.width <= 0 || self.surface_config.height <= 0 {
 			return;
 		}
 
-		let current_frame_surface_texture = self.surface.get_current_texture().unwrap();
+		let current_frame_surface_texture = match self.surface.get_current_texture() {
+			Ok(frame) => frame,
+			Err(_) => {
+				self.resize(self.surface_config.width, self.surface_config.height);
+				self.surface.get_current_texture()
+					.expect("Failed to acquire next frame texture")
+			}
+		};
+
 		let current_frame_view = current_frame_surface_texture.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
 		let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
@@ -484,8 +528,8 @@ impl Renderer {
 			label: None,
 			color_attachments: &[Some(
 				wgpu::RenderPassColorAttachment {
-					view: &current_frame_view,
-					resolve_target: None,
+					view: &self.framebuffer,
+					resolve_target: Some(&current_frame_view),
 					ops: wgpu::Operations {
 						load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
 						store: wgpu::StoreOp::Store,
