@@ -60,8 +60,8 @@ impl Renderer {
 		println!("device created");
 
 		let mut surface_config = surface.get_default_config(&adapter, size.width, size.height).ok_or_else(|| anyhow::format_err!("Failed to get surface config"))?;
-		// surface_config.present_mode = wgpu::PresentMode::AutoVsync;
-		surface_config.present_mode = wgpu::PresentMode::Fifo;
+		surface_config.present_mode = wgpu::PresentMode::AutoVsync;
+		// surface_config.present_mode = wgpu::PresentMode::Fifo;
 		surface.configure(&device, &surface_config);
 
 		println!("surface configured");
@@ -251,7 +251,8 @@ impl Renderer {
 
 		let current_frame_surface_texture = match self.surface.get_current_texture() {
 			Ok(frame) => frame,
-			Err(_) => {
+			Err(err) => {
+				println!("acquire texture error: {}", err);
 				self.resize(self.surface_config.width, self.surface_config.height);
 				self.surface.get_current_texture()
 					.expect("Failed to acquire next frame texture")

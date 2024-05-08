@@ -79,6 +79,10 @@ async fn main() -> anyhow::Result<()> {
 			window.set_visible(true);
 		}
 
+		if let Event::AboutToWait = event {
+			window.request_redraw();
+		}
+
 		if let Event::WindowEvent { window_id, event } = event {
 			match event {
 				WindowEvent::RedrawRequested => {
@@ -109,13 +113,12 @@ async fn main() -> anyhow::Result<()> {
 					window.pre_present_notify();
 					renderer.present();
 
-					window.request_redraw();
-
 					time += 1.0/60.0;
 				}
-				
+
 				WindowEvent::Resized(new_size) => {
 					renderer.resize(new_size.width, new_size.height);
+					window.request_redraw();
 				}
 
 				WindowEvent::CloseRequested => {
