@@ -1,7 +1,8 @@
 use crate::prelude::*;
 
 use lyon::math::{Point, Box2D};
-use lyon::path::Path;
+use lyon::path::{Path, PathBuffer, Winding as PathWinding};
+use lyon::path::builder::{PathBuilder, BorderRadii};
 use lyon::tessellation::*;
 
 
@@ -12,6 +13,8 @@ pub struct Painter {
 	stroke_tess: StrokeTessellator,
 	fill_options: FillOptions,
 	stroke_options: StrokeOptions,
+
+	scratch_path: PathBuffer,
 }
 
 impl Painter {
@@ -21,14 +24,19 @@ impl Painter {
 			fill_tess: FillTessellator::new(),
 			stroke_tess: StrokeTessellator::new(),
 
-			fill_options: FillOptions::tolerance(0.02).with_fill_rule(FillRule::NonZero),
-			stroke_options: StrokeOptions::DEFAULT,
+			fill_options: FillOptions::tolerance(0.1).with_fill_rule(FillRule::NonZero),
+			stroke_options: StrokeOptions::tolerance(0.1),
+
+			scratch_path: PathBuffer::new(),
 		}
 	}
 
 	pub fn clear(&mut self) {
 		self.geometry.vertices.clear();
 		self.geometry.indices.clear();
+
+		self.fill_options = FillOptions::tolerance(0.5).with_fill_rule(FillRule::NonZero);
+		self.stroke_options = StrokeOptions::tolerance(0.5);
 	}
 
 	fn geo_builder<'g>(geo: &'g mut VertexBuffers<renderer::Vertex, u32>, color: impl Into<Color>) -> (impl StrokeGeometryBuilder + FillGeometryBuilder + 'g) {
@@ -38,24 +46,54 @@ impl Painter {
 }
 
 impl Painter {
-	pub fn circle(&mut self, pos: impl Into<Vec2>, r: f32, color: impl Into<Color>) {
+	pub fn set_line_width(&mut self, width: f32) {
+		self.stroke_options.line_width = width;
+	}
+}
+
+impl Painter {
+	pub fn circle_outline(&mut self, pos: impl Into<Vec2>, r: f32, color: impl Into<Color>) {
 		let pos = to_point(pos.into());
 		self.stroke_tess.tessellate_circle(pos, r, &self.stroke_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
 	}
 
-	pub fn fill_circle(&mut self, pos: impl Into<Vec2>, r: f32, color: impl Into<Color>) {
+	pub fn circle(&mut self, pos: impl Into<Vec2>, r: f32, color: impl Into<Color>) {
 		let pos = to_point(pos.into());
 		self.fill_tess.tessellate_circle(pos, r, &self.fill_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
 	}
 
-	pub fn rect(&mut self, rect: impl Into<Aabb2>, color: impl Into<Color>) {
+	pub fn rect_outline(&mut self, rect: impl Into<Aabb2>, color: impl Into<Color>) {
 		let rect = to_box(rect.into());
 		self.stroke_tess.tessellate_rectangle(&rect, &self.stroke_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
 	}
 
-	pub fn fill_rect(&mut self, rect: impl Into<Aabb2>, color: impl Into<Color>) {
+	pub fn rect(&mut self, rect: impl Into<Aabb2>, color: impl Into<Color>) {
 		let rect = to_box(rect.into());
 		self.fill_tess.tessellate_rectangle(&rect, &self.fill_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+	}
+
+	pub fn rounded_rect_outline(&mut self, rect: impl Into<Aabb2>, radii: impl IntoBorderRadii, color: impl Into<Color>) {
+		let rect = to_box(rect.into());
+
+		self.scratch_path.clear();
+
+		let mut builder = self.scratch_path.builder();
+		builder.add_rounded_rectangle(&rect, &radii.to_radii(), PathWinding::Positive, &[]);
+		builder.build();
+
+		self.stroke_tess.tessellate(self.scratch_path.get(0).iter(), &self.stroke_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+	}
+
+	pub fn rounded_rect(&mut self, rect: impl Into<Aabb2>, radii: impl IntoBorderRadii, color: impl Into<Color>) {
+		let rect = to_box(rect.into());
+
+		self.scratch_path.clear();
+
+		let mut builder = self.scratch_path.builder();
+		builder.add_rounded_rectangle(&rect, &radii.to_radii(), PathWinding::Positive, &[]);
+		builder.build();
+
+		self.fill_tess.tessellate(self.scratch_path.get(0).iter(), &self.fill_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
 	}
 
 	pub fn stroke_path(&mut self, path: &Path, color: impl Into<Color>) {
@@ -67,6 +105,25 @@ impl Painter {
 	}
 }
 
+
+
+pub trait IntoBorderRadii {
+	fn to_radii(&self) -> BorderRadii;
+}
+
+impl IntoBorderRadii for f32 {
+	fn to_radii(&self) -> BorderRadii {
+		BorderRadii::new(*self)
+	}
+}
+
+impl IntoBorderRadii for BorderRadii {
+	fn to_radii(&self) -> BorderRadii {
+		*self
+	}
+}
+
+// TODO(pat.m): IntoBorderRadii for type that can represent which corners should be rounded
 
 
 

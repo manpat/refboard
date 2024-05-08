@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use wgpu::util::DeviceExt;
+// use wgpu::util::DeviceExt;
 use std::sync::Arc;
 
 pub struct Renderer {
@@ -20,6 +20,8 @@ pub struct Renderer {
 
 	vertex_bytes: u64,
 	index_bytes: u64,
+
+	msaa_samples: u32,
 }
 
 impl Renderer {
@@ -36,6 +38,7 @@ impl Renderer {
 
 		// create an adapter
 		let Some(adapter) = instance.request_adapter(&wgpu::RequestAdapterOptions {
+			// power_preference: wgpu::PowerPreference::HighPerformance,
 			power_preference: wgpu::PowerPreference::LowPower,
 			compatible_surface: Some(&surface),
 			force_fallback_adapter: false,
@@ -50,7 +53,7 @@ impl Renderer {
 		let (device, queue) = adapter.request_device(
 			&wgpu::DeviceDescriptor {
 				label: None,
-				required_features: wgpu::Features::default(),
+				required_features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
 				required_limits: wgpu::Limits::default(),
 			},
 			None,
@@ -60,8 +63,7 @@ impl Renderer {
 		println!("device created");
 
 		let mut surface_config = surface.get_default_config(&adapter, size.width, size.height).ok_or_else(|| anyhow::format_err!("Failed to get surface config"))?;
-		surface_config.present_mode = wgpu::PresentMode::AutoVsync;
-		// surface_config.present_mode = wgpu::PresentMode::Fifo;
+		surface_config.present_mode = wgpu::PresentMode::AutoNoVsync;
 		surface.configure(&device, &surface_config);
 
 		println!("surface configured");
@@ -96,6 +98,12 @@ impl Renderer {
 		let swapchain_capabilities = surface.get_capabilities(&adapter);
 		let swapchain_format = swapchain_capabilities.formats[0];
 
+		let supported_sample_counts = adapter.get_texture_format_features(swapchain_format).flags.supported_sample_counts();
+		let msaa_samples = supported_sample_counts.into_iter().max().unwrap_or(1);
+
+		println!("Using MSAA x{msaa_samples}");
+
+
 		let vector_render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
 			label: None,
 			layout: Some(&pipeline_layout),
@@ -128,7 +136,7 @@ impl Renderer {
 			},
 			depth_stencil: None,
 			multisample: wgpu::MultisampleState {
-				count: 4,
+				count: msaa_samples,
 				.. wgpu::MultisampleState::default()
 			},
 			multiview: None,
@@ -166,7 +174,7 @@ impl Renderer {
 			],
 		});
 
-		let framebuffer = Self::create_framebuffer(&device, &surface_config, 4);
+		let framebuffer = Self::create_framebuffer(&device, &surface_config, msaa_samples);
 
 		Ok(Renderer {
 			device,
@@ -185,6 +193,8 @@ impl Renderer {
 
 			vertex_bytes: 0,
 			index_bytes: 0,
+
+			msaa_samples,
 		})
 	}
 
@@ -217,11 +227,11 @@ impl Renderer {
 
 		if new_width > 0 && new_height > 0 {
 			self.surface.configure(&self.device, &self.surface_config);
-			self.framebuffer = Self::create_framebuffer(&self.device, &self.surface_config, 4);
+			self.framebuffer = Self::create_framebuffer(&self.device, &self.surface_config, self.msaa_samples);
 		}
 	}
 
-	pub fn prepare(&mut self, painter: &Painter) {
+	pub fn prepare(&mut self, painter: &Painter, viewport: &view::Viewport) {
 		let vertex_bytes = bytemuck::cast_slice(&painter.geometry.vertices);
 		let index_bytes = bytemuck::cast_slice(&painter.geometry.indices);
 
@@ -231,15 +241,12 @@ impl Renderer {
 		self.vertex_bytes = vertex_bytes.len() as u64;
 		self.index_bytes = index_bytes.len() as u64;
 		
-		let surface_width = self.surface_config.width as f32;
-		let surface_height = self.surface_config.height as f32;
+		let [basis_x, basis_y, translation] = viewport.view_to_clip().columns();
 
-		let aspect = surface_width / surface_height;
-		let scale = 0.04;
 		self.queue.write_buffer(&self.globals_buffer, 0, bytemuck::cast_slice(&[
 			Globals {
-				row_x: [ scale/aspect, 0.0, 0.0,  0.0],
-				row_y: [         0.0, scale, 0.0, 0.0],
+				row_x: [ basis_x.x, basis_y.x, 0.0, translation.x],
+				row_y: [ basis_x.y, basis_y.y, 0.0, translation.y],
 			}
 		]));
 	}
@@ -251,8 +258,7 @@ impl Renderer {
 
 		let current_frame_surface_texture = match self.surface.get_current_texture() {
 			Ok(frame) => frame,
-			Err(err) => {
-				println!("acquire texture error: {}", err);
+			Err(_) => {
 				self.resize(self.surface_config.width, self.surface_config.height);
 				self.surface.get_current_texture()
 					.expect("Failed to acquire next frame texture")
@@ -266,13 +272,24 @@ impl Renderer {
 		let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 			label: None,
 			color_attachments: &[Some(
-				wgpu::RenderPassColorAttachment {
-					view: &self.framebuffer,
-					resolve_target: Some(&current_frame_view),
-					ops: wgpu::Operations {
-						load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-						store: wgpu::StoreOp::Store,
-					},
+				if self.msaa_samples == 1 {
+					wgpu::RenderPassColorAttachment {
+						view: &current_frame_view,
+						resolve_target: None,
+						ops: wgpu::Operations {
+							load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+							store: wgpu::StoreOp::Store,
+						},
+					}
+				} else {
+					wgpu::RenderPassColorAttachment {
+						view: &self.framebuffer,
+						resolve_target: Some(&current_frame_view),
+						ops: wgpu::Operations {
+							load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+							store: wgpu::StoreOp::Store,
+						},
+					}
 				}
 			)],
 			depth_stencil_attachment: None,

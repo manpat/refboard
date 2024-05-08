@@ -1,3 +1,5 @@
+#![feature(let_chains)]
+
 use winit::{
 	event::{Event, WindowEvent, StartCause},
 	event_loop::{EventLoop, ControlFlow},
@@ -11,24 +13,26 @@ use common::*;
 
 pub mod renderer;
 pub mod painter;
+pub mod app;
+pub mod view;
 
 pub mod prelude {
 	pub use common::*;
 
-	pub use super::painter::{self, Painter};
-	pub use super::renderer;
+	pub use super::{painter, renderer, app, view};
+	pub use painter::Painter;
+	pub use app::{ItemKey, ImageKey};
 }
 
 
 
-#[tokio::main]
+#[tokio::main(worker_threads=4)]
 async fn main() -> anyhow::Result<()> {
 	env_logger::init();
 
-	// use winit::platform::windows::WindowBuilderExtWindows;
-
 	let event_loop = EventLoop::new()?;
-	let mut window_builder = WindowBuilder::new()
+
+	let window_builder = WindowBuilder::new()
 		.with_title("refboard")
 		.with_resizable(true)
 		// .with_transparent(true) // Doesn't work
@@ -36,10 +40,10 @@ async fn main() -> anyhow::Result<()> {
 		.with_window_level(WindowLevel::AlwaysOnTop)
 		.with_visible(false);
 
-	#[cfg(windows)] {
-		use winit::platform::windows::WindowBuilderExtWindows;
-		window_builder = window_builder.with_no_redirection_bitmap(true);
-	}
+	// #[cfg(windows)] {
+	// 	use winit::platform::windows::WindowBuilderExtWindows;
+	// 	window_builder = window_builder.with_no_redirection_bitmap(true);
+	// }
 
 	let window = Arc::new(window_builder.build(&event_loop)?);
 
@@ -63,70 +67,79 @@ async fn main() -> anyhow::Result<()> {
 	let mut renderer = renderer::Renderer::start(window.clone()).await?;
 	let mut painter = painter::Painter::new();
 
-	let mut time = 0.0f32;
+	let mut app = app::App::default();
+	let mut view = view::View::new();
+	view.set_size({
+		let physical_size = window.inner_size().cast();
+		Vec2i::new(physical_size.width, physical_size.height)
+	});
 
 	event_loop.set_control_flow(ControlFlow::Wait);
 
 	event_loop.run(move |event, target| {
+		match event {
+			// Initial present/show window
+			Event::NewEvents(StartCause::Init) => {
+				renderer.prepare(&painter, &view.viewport);
 
-		// Initial present/show window
-		if let Event::NewEvents(StartCause::Init) = event {
-			renderer.prepare(&painter);
+				window.pre_present_notify();
+				renderer.present();
 
-			window.pre_present_notify();
-			renderer.present();
+				// Only set visible now to avoid flashing on startup
+				window.set_visible(true);
+			}
 
-			window.set_visible(true);
-		}
+			Event::WindowEvent { window_id: _, event } => {
+				match event {
+					WindowEvent::RedrawRequested => {
+						view.update_input();
 
-		if let Event::AboutToWait = event {
-			window.request_redraw();
-		}
+						painter.clear();
+						view.paint(&mut painter, &app);
+						renderer.prepare(&painter, &view.viewport);
 
-		if let Event::WindowEvent { window_id, event } = event {
-			match event {
-				WindowEvent::RedrawRequested => {
-					use lyon::math::point;
-					use lyon::path::Path;
+						window.pre_present_notify();
+						renderer.present();
+					}
 
-					let mut builder = Path::builder();
-					builder.begin(point(-7.0, 0.0));
-					builder.line_to(point(-7.0, 7.0));
-					builder.line_to(point(0.0, 7.0));
-					builder.quadratic_bezier_to(point(7.0, 7.0), point(7.0, 0.0));
-					builder.end(false);
+					WindowEvent::Resized(new_physical_size) => {
+						renderer.resize(new_physical_size.width, new_physical_size.height);
+						view.set_size(Vec2i::new(new_physical_size.width as i32, new_physical_size.height as i32));
+					}
 
-					let path = builder.build();
+					// TODO(pat.m): theme change
+					// TODO(pat.m): dpi change
 
-					painter.clear();
-					painter.fill_path(&path, [0.3, 0.2, 0.9]);
-					painter.stroke_path(&path, [0.3, 1.0, 0.6]);
+					WindowEvent::CloseRequested => {
+						// TODO(pat.m): this should defer to the view
+						target.exit();
+					}
 
-					painter.fill_circle(Vec2::zero(), 5.0, [1.0, 0.5, 1.0]);
-					painter.circle(Vec2::from_y(time.sin()*5.0), 5.0, [0.3, 0.1, 0.35]);
+					WindowEvent::MouseInput{..}
+						| WindowEvent::CursorEntered{..}
+						| WindowEvent::CursorLeft{..}
+						| WindowEvent::CursorMoved{..}
+						| WindowEvent::MouseWheel{..}
+						| WindowEvent::KeyboardInput{..}
+					=> {
+						view.input.send_event(event);
+						window.request_redraw();
+					}
 
-					painter.rect(Aabb2::around_point(Vec2::zero(), Vec2::new(9.0, 9.0)), [1.0, 1.0, 1.0]);
-
-
-					renderer.prepare(&painter);
-
-					window.pre_present_notify();
-					renderer.present();
-
-					time += 1.0/60.0;
+					_ => {}
 				}
+			}
 
-				WindowEvent::Resized(new_size) => {
-					renderer.resize(new_size.width, new_size.height);
+			Event::AboutToWait => {
+				if view.should_redraw() {
 					window.request_redraw();
 				}
 
-				WindowEvent::CloseRequested => {
-					target.exit();
-				}
-
-				_ => {}
+				app.apply_changes();
+				view.prepare_frame();
 			}
+
+			_ => {}
 		}
 	})
 	.map_err(Into::into)

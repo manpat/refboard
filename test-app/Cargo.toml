@@ -11,6 +11,7 @@ wgpu = "0.19"
 winit = "0.29"
 bytemuck = "1.2.0"
 anyhow = "1.0.81"
+slotmap = { version = "1.0", features = ["serde"] }
 
 tokio = { version = "1", features = ["full"] }
 raw-window-handle = "0.6.0"
