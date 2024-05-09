@@ -1562,6 +1562,7 @@ dependencies = [
  "lyon",
  "raw-window-handle",
  "slotmap",
+ "smallvec",
  "tokio",
  "wgpu",
  "windows 0.54.0",

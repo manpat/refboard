@@ -22,12 +22,20 @@ pub mod prelude {
 	pub use super::{painter, renderer, app, view};
 	pub use painter::Painter;
 	pub use app::{ItemKey, ImageKey};
+
+	pub use smallvec::SmallVec;
+	pub use slotmap::{SlotMap, SecondaryMap};
+
+	pub use std::collections::{VecDeque, HashMap, HashSet};
+	pub use std::cell::{Cell, RefCell};
 }
 
 
 
 #[tokio::main(worker_threads=4)]
 async fn main() -> anyhow::Result<()> {
+	std::env::set_var("RUST_BACKTRACE", "1");
+
 	env_logger::init();
 
 	let event_loop = EventLoop::new()?;
