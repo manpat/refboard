@@ -103,6 +103,30 @@ impl Painter {
 	pub fn fill_path(&mut self, path: &Path, color: impl Into<Color>) {
 		self.fill_tess.tessellate_path(path, &self.fill_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
 	}
+
+	pub fn line(&mut self, start: impl Into<Vec2>, end: impl Into<Vec2>, color: impl Into<Color>) {
+		use lyon::path::PathEvent;
+
+		let start = to_point(start.into());
+		let end = to_point(end.into());
+
+		let events = [
+			PathEvent::Begin{
+				at: start
+			},
+			PathEvent::Line{
+				from: start,
+				to: end,
+			},
+			PathEvent::End{
+				last: end,
+				first: start,
+				close: false,
+			},
+		];
+
+		self.stroke_tess.tessellate(events, &self.stroke_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+	}
 }
 
 
