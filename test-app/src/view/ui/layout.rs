@@ -142,6 +142,7 @@ pub struct LayoutConstraints {
 	pub max_width: WidgetParameter<f32>,
 	pub max_height: WidgetParameter<f32>,
 
+	// TODO(pat.m): should this include or exclude padding?
 	pub preferred_width: WidgetParameter<f32>,
 	pub preferred_height: WidgetParameter<f32>,
 
@@ -222,6 +223,10 @@ impl LayoutConstraints {
 	pub fn outer_desired_width(&self) -> f32 {
 		self.desired_width() + self.margin.horizontal_sum()
 	}
+
+	pub fn outer_max_width(&self) -> f32 {
+		self.max_width.get() + self.margin.horizontal_sum()
+	}
 }
 
 
@@ -238,8 +243,12 @@ pub fn layout_children(
 		return;
 	}
 
+	let available_width = available_bounds.width();
+	let widget_count = widgets.len();
+
 	let mut total_min_width = 0.0f32;
 	let mut total_preferred_width = 0.0f32;
+	let mut total_max_width = 0.0f32;
 
 	for &widget_id in widgets {
 		let constraints = &constraints[widget_id];
@@ -247,14 +256,14 @@ pub fn layout_children(
 		let min_width = constraints.outer_min_width();
 		let preferred_width = constraints.outer_desired_width();
 
+		let max_width = constraints.outer_max_width().min(available_width);
+		total_max_width += max_width;
+
 		total_min_width += min_width;
 		total_preferred_width += preferred_width;
 
 		layouts.insert(widget_id, Layout::default());
 	}
-
-	let available_width = available_bounds.width();
-	let widget_count = widgets.len();
 
 	let mut cursor = available_bounds.min_max_corner();
 
@@ -318,10 +327,22 @@ pub fn layout_children(
 		return;
 	}
 
+	// available_width > total_preferred_width
+	let total_weight = total_max_width - total_preferred_width;
+	let spare_space = available_width - total_preferred_width;
+
 	for &widget_id in widgets {
 		let constraints = &constraints[widget_id];
 
-		let padding_width = constraints.desired_width();
+		let max_width = constraints.outer_max_width().min(available_width);
+
+		let padding_width = {
+			let weight = max_width - constraints.outer_desired_width();
+			let extra_width = weight / total_weight * spare_space;
+
+			constraints.desired_width() + extra_width
+		};
+
 		let padding_height = constraints.desired_height();
 
 		let margin_box_tl = cursor + Vec2::new(constraints.margin.left.get(), -constraints.margin.top.get());

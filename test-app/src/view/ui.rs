@@ -155,12 +155,12 @@ pub trait Widget : std::fmt::Debug {
 
 	fn draw(&self, painter: &mut Painter, layout: &Layout) {
 		let widget_color = [0.5; 3];
-		painter.rect_outline(layout.box_bounds, widget_color);
+		painter.rounded_rect_outline(layout.box_bounds, 8.0, widget_color);
 		painter.line(layout.box_bounds.min, layout.box_bounds.max, widget_color);
 		painter.line(layout.box_bounds.min_max_corner(), layout.box_bounds.max_min_corner(), widget_color);
 
-		painter.rect_outline(layout.margin_bounds, [0.1, 0.5, 1.0, 0.5]);
-		painter.rect_outline(layout.content_bounds, [0.5, 1.0, 0.5, 0.5]);
+		painter.rounded_rect_outline(layout.margin_bounds, 8.0, [0.1, 0.5, 1.0, 0.5]);
+		painter.rounded_rect_outline(layout.content_bounds, 8.0, [0.5, 1.0, 0.5, 0.5]);
 	}
 }
 
@@ -173,6 +173,9 @@ impl Widget for () {
 		ctx.constraints.preferred_height.set_default(50.0);
 		ctx.constraints.min_width.set_default(10.0);
 		ctx.constraints.min_height.set_default(10.0);
+
+		ctx.constraints.max_width.set_default(100.0);
+		ctx.constraints.max_height.set_default(100.0);
 	}
 }
 
@@ -220,13 +223,13 @@ impl Widget for BoxLayout {
 
 	fn draw(&self, painter: &mut Painter, layout: &Layout) {
 		let widget_color = Color::grey_a(1.0, 0.01);
-		painter.rect(layout.box_bounds, widget_color);
-		painter.rect_outline(layout.box_bounds, Color::grey_a(1.0, 0.04));
+		painter.rounded_rect(layout.box_bounds, 8.0, widget_color);
+		painter.rounded_rect_outline(layout.box_bounds, 8.0, Color::grey_a(1.0, 0.04));
 		// painter.line(layout.box_bounds.min, layout.box_bounds.max, widget_color);
 		// painter.line(layout.box_bounds.min_max_corner(), layout.box_bounds.max_min_corner(), widget_color);
 
-		painter.rect_outline(layout.content_bounds, [0.1, 0.4, 0.1]);
-		painter.rect_outline(layout.margin_bounds, [0.1, 0.1, 0.4]);
+		painter.rounded_rect_outline(layout.content_bounds, 8.0, [0.1, 0.4, 0.1]);
+		painter.rounded_rect_outline(layout.margin_bounds, 8.0, [0.1, 0.1, 0.4]);
 	}
 }
 

@@ -64,7 +64,7 @@ impl View {
 		// painter.rounded_rect_outline(button_rect.translate(Vec2::new(0.75, -186.0)), 10.0, [1.0, 1.0, 1.0]);
 		// painter.rounded_rect_outline(button_rect.translate(Vec2::new(1.0, -248.0)), 10.0, [1.0, 1.0, 1.0]);
 
-		// painter.set_line_width(1.0);
+		// painter.set_line_width(3.0);
 		// painter.rect_outline(view_bounds.shrink(Vec2::splat(1.0)), [1.0, 0.5, 1.0]);
 
 		// // Menu
@@ -95,6 +95,7 @@ impl View {
 			let wdg3 = ui.add_widget(());
 			ui.mutate_widget_constraints(wdg3, |lc| {
 				lc.min_width.set(50.0);
+				lc.max_width.set(f32::INFINITY);
 				lc.preferred_width.set(100.0);
 				lc.preferred_height.set(75.0);
 			});
@@ -102,6 +103,7 @@ impl View {
 			let wdg3 = ui.add_widget(());
 			ui.mutate_widget_constraints(wdg3, |lc| {
 				lc.min_width.set(25.0);
+				lc.max_width.set(1000.0);
 				lc.preferred_width.set(200.0);
 				lc.preferred_height.set(100.0);
 			});
