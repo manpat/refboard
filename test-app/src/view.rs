@@ -83,6 +83,14 @@ impl View {
 			let wdg2 = ui.add_widget_to(ui::BoxLayout{}, wdg);
 			ui.add_widget_to((), wdg2);
 
+			ui.mutate_widget_constraints(wdg, |lc| {
+				lc.min_height = 100.0;
+				lc.margin.top = 50.0;
+				lc.margin.bottom = 50.0;
+				lc.margin.left = 20.0;
+				lc.margin.right = 20.0;
+			});
+
 			ui.dummy();
 		});
 

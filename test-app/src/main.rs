@@ -26,6 +26,8 @@ pub mod prelude {
 	pub use smallvec::SmallVec;
 	pub use slotmap::{SlotMap, SecondaryMap};
 
+	pub use bitflags::bitflags;
+
 	pub use std::collections::{VecDeque, HashMap, HashSet};
 	pub use std::cell::{Cell, RefCell};
 }

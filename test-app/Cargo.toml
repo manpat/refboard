@@ -12,6 +12,7 @@ winit = "0.29"
 bytemuck = "1.2.0"
 anyhow = "1.0.81"
 slotmap = { version = "1.0", features = ["serde"] }
+bitflags = "2.5"
 
 smallvec = "1.13"
 
