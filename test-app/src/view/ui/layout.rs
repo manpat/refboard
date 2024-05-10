@@ -1,54 +1,155 @@
 use crate::prelude::*;
-use super::{WidgetId, BoxLengths, WidgetBox};
+use super::{WidgetId};
 
 
 pub type LayoutConstraintMap = SecondaryMap<WidgetId, LayoutConstraints>;
 
-bitflags! {
-	#[derive(Copy, Clone, Debug)]
-	pub struct SetConstraints : u32 {
-		const MIN_WIDTH = 1 << 0;
-		const MIN_HEIGHT = 1 << 1;
 
-		const MAX_WIDTH = 1 << 2;
-		const MAX_HEIGHT = 1 << 3;
 
-		const CONTENT_WIDTH = 1 << 4;
-		const CONTENT_HEIGHT = 1 << 5;
+#[derive(Debug, Clone, Copy, Default)]
+pub struct WidgetParameter<T> {
+	value: T,
+	set: bool,
+}
 
-		const MARGIN_TOP = 1 << 6;
-		const MARGIN_BOTTOM = 1 << 7;
-		const MARGIN_LEFT = 1 << 8;
-		const MARGIN_RIGHT = 1 << 9;
+impl<T> WidgetParameter<T> {
+	pub fn new(initial_value: T) -> Self {
+		WidgetParameter {
+			value: initial_value,
+			set: false,
+		}
+	}
 
-		const ALL_MARGINS = 0b1111 << 6;
+	pub fn set(&mut self, value: T) {
+		self.value = value;
+		self.set = true;
+	}
 
-		const PADDING_TOP = 1 << 10;
-		const PADDING_BOTTOM = 1 << 11;
-		const PADDING_LEFT = 1 << 12;
-		const PADDING_RIGHT = 1 << 13;
+	pub fn set_default(&mut self, value: T) {
+		if !self.set {
+			self.value = value;
+		}
+	}
 
-		const ALL_PADDING = 0b1111 << 10;
+	pub fn get(&self) -> T
+		where T: Copy
+	{
+		self.value
 	}
 }
 
 
 
+#[derive(Default, Debug, Copy, Clone)]
+pub struct BoxLengths {
+	pub left: WidgetParameter<f32>,
+	pub right: WidgetParameter<f32>,
+	pub top: WidgetParameter<f32>,
+	pub bottom: WidgetParameter<f32>,
+}
+
+impl BoxLengths {
+	pub fn zero() -> BoxLengths {
+		BoxLengths::default()
+	}
+
+	pub fn new(left: f32, right: f32, top: f32, bottom: f32) -> BoxLengths {
+		BoxLengths {
+			left: WidgetParameter::new(left),
+			right: WidgetParameter::new(right),
+			top: WidgetParameter::new(top),
+			bottom: WidgetParameter::new(bottom),
+		}
+	}
+
+	pub fn uniform(v: f32) -> BoxLengths {
+		BoxLengths::new(v, v, v, v)
+	}
+
+	pub fn from_axes(h: f32, v: f32) -> BoxLengths {
+		BoxLengths::new(h, h, v, v)
+	}
+
+	pub fn set(&mut self, other: impl Into<BoxLengths>) {
+		let BoxLengths{left, right, top, bottom} = other.into();
+		self.left.set(left.get());
+		self.right.set(right.get());
+		self.top.set(top.get());
+		self.bottom.set(bottom.get());
+	}
+
+	pub fn set_default(&mut self, other: impl Into<BoxLengths>) {
+		let BoxLengths{left, right, top, bottom} = other.into();
+		self.left.set_default(left.get());
+		self.right.set_default(right.get());
+		self.top.set_default(top.get());
+		self.bottom.set_default(bottom.get());
+	}
+
+	pub fn set_horizontal(&mut self, value: f32) {
+		self.left.set(value);
+		self.right.set(value);
+	}
+
+	pub fn set_vertical(&mut self, value: f32) {
+		self.top.set(value);
+		self.bottom.set(value);
+	}
+
+	pub fn set_uniform(&mut self, value: f32) {
+		self.set_horizontal(value);
+		self.set_vertical(value);
+	}
+
+	pub fn horizontal_sum(&self) -> f32 {
+		self.left.get() + self.right.get()
+	}
+
+	pub fn vertical_sum(&self) -> f32 {
+		self.top.get() + self.bottom.get()
+	}
+}
+
+impl From<f32> for BoxLengths {
+	fn from(o: f32) -> Self {
+		BoxLengths::uniform(o)
+	}
+}
+
+impl From<Vec2> for BoxLengths {
+	fn from(o: Vec2) -> Self {
+		BoxLengths::from_axes(o.x, o.y)
+	}
+}
+
+impl From<(f32, f32)> for BoxLengths {
+	fn from((x, y): (f32, f32)) -> Self {
+		BoxLengths::from_axes(x, y)
+	}
+}
+
+// #[derive(Debug, Clone, Copy)]
+// pub enum SizingBehaviour {
+// 	Normal,
+// }
 
 
 #[derive(Debug, Clone)]
 pub struct LayoutConstraints {
-	pub min_width: f32,
-	pub min_height: f32,
+	pub min_width: WidgetParameter<f32>,
+	pub min_height: WidgetParameter<f32>,
 
-	pub max_width: f32,
-	pub max_height: f32,
+	pub max_width: WidgetParameter<f32>,
+	pub max_height: WidgetParameter<f32>,
 
-	pub content_width: f32,
-	pub content_height: f32,
+	pub preferred_width: WidgetParameter<f32>,
+	pub preferred_height: WidgetParameter<f32>,
 
 	pub margin: BoxLengths,
 	pub padding: BoxLengths,
+
+	// pub horizontal_size_policy: WidgetParameter<SizingBehaviour>,
+	// pub vertical_size_policy: WidgetParameter<SizingBehaviour>,
 
 	// TODO(pat.m): baselines??
 
@@ -57,181 +158,69 @@ pub struct LayoutConstraints {
 
 	// children layout policy
 
-	pub set: SetConstraints,
+	// pub set: SetConstraints,
 }
 
 impl Default for LayoutConstraints {
 	fn default() -> Self {
 		LayoutConstraints {
-			min_width: 0.0,
-			min_height: 0.0,
+			min_width: WidgetParameter::new(0.0),
+			min_height: WidgetParameter::new(0.0),
 
-			max_width: f32::INFINITY,
-			max_height: f32::INFINITY,
+			max_width: WidgetParameter::new(f32::INFINITY),
+			max_height: WidgetParameter::new(f32::INFINITY),
 
-			content_width: 0.0,
-			content_height: 0.0,
+			preferred_width: WidgetParameter::new(0.0),
+			preferred_height: WidgetParameter::new(0.0),
 
 			margin: BoxLengths::default(),
 			padding: BoxLengths::default(),
 
-			set: SetConstraints::empty(),
+			// horizontal_size_policy: WidgetParameter::new(SizePolicy::PREFERRED),
+			// vertical_size_policy: WidgetParameter::new(SizePolicy::PREFERRED),
 		}
 	}
 }
 
 impl LayoutConstraints {
-	pub fn set_min_width(&mut self, min_width: f32) {
-		self.min_width = min_width;
-		self.set.insert(SetConstraints::MIN_WIDTH);
-	}
-
-	pub fn set_min_height(&mut self, min_height: f32) {
-		self.min_height = min_height;
-		self.set.insert(SetConstraints::MIN_HEIGHT);
-	}
-
-	pub fn set_min_size(&mut self, min_size: Vec2) {
-		self.set_min_width(min_size.x);
-		self.set_min_height(min_size.y);
-	}
-
-	pub fn set_max_width(&mut self, max_width: f32) {
-		self.max_width = max_width;
-		self.set.insert(SetConstraints::MAX_WIDTH);
-	}
-
-	pub fn set_max_height(&mut self, max_height: f32) {
-		self.max_height = max_height;
-		self.set.insert(SetConstraints::MAX_HEIGHT);
-	}
-
-	pub fn set_max_size(&mut self, max_size: Vec2) {
-		self.set_max_width(max_size.x);
-		self.set_max_height(max_size.y);
-	}
-
-	pub fn set_content_width(&mut self, content_width: f32) {
-		self.content_width = content_width;
-		self.set.insert(SetConstraints::CONTENT_WIDTH);
-	}
-	
-	pub fn set_content_height(&mut self, content_height: f32) {
-		self.content_height = content_height;
-		self.set.insert(SetConstraints::CONTENT_HEIGHT);
-	}
-
-	pub fn set_content_size(&mut self, content_size: Vec2) {
-		self.set_content_width(content_size.x);
-		self.set_content_height(content_size.y);
-	}
-
-
 	pub fn set_width(&mut self, width: f32) {
-		self.set_min_width(width);
-		self.set_max_width(width);
+		self.min_width.set(width);
+		self.max_width.set(width);
 	}
+
 	pub fn set_height(&mut self, height: f32) {
-		self.set_min_height(height);
-		self.set_max_height(height);
+		self.min_height.set(height);
+		self.max_height.set(height);
 	}
+
 	pub fn set_size(&mut self, size: Vec2) {
-		self.set_min_size(size);
-		self.set_max_size(size);
-	}
-
-
-	pub fn set_margin_top(&mut self, top: f32) {
-		self.margin.top = top;
-		self.set.insert(SetConstraints::MARGIN_TOP);
-	}
-	
-	pub fn set_margin_bottom(&mut self, bottom: f32) {
-		self.margin.bottom = bottom;
-		self.set.insert(SetConstraints::MARGIN_BOTTOM);
-	}
-
-	pub fn set_margin_left(&mut self, left: f32) {
-		self.margin.left = left;
-		self.set.insert(SetConstraints::MARGIN_LEFT);
-	}
-	
-	pub fn set_margin_right(&mut self, right: f32) {
-		self.margin.right = right;
-		self.set.insert(SetConstraints::MARGIN_RIGHT);
-	}
-
-	pub fn set_horizontal_margin(&mut self, margin: f32) {
-		self.set_margin_left(margin);
-		self.set_margin_right(margin);
-	}
-
-	pub fn set_vertical_margin(&mut self, margin: f32) {
-		self.set_margin_top(margin);
-		self.set_margin_bottom(margin);
-	}
-
-	pub fn set_margin(&mut self, margin: impl Into<BoxLengths>) {
-		self.margin = margin.into();
-		self.set.insert(SetConstraints::ALL_MARGINS);
-	}
-
-
-	pub fn set_padding_top(&mut self, top: f32) {
-		self.padding.top = top;
-		self.set.insert(SetConstraints::PADDING_TOP);
-	}
-	
-	pub fn set_padding_bottom(&mut self, bottom: f32) {
-		self.padding.bottom = bottom;
-		self.set.insert(SetConstraints::PADDING_BOTTOM);
-	}
-
-	pub fn set_padding_left(&mut self, left: f32) {
-		self.padding.left = left;
-		self.set.insert(SetConstraints::PADDING_LEFT);
-	}
-	
-	pub fn set_padding_right(&mut self, right: f32) {
-		self.padding.right = right;
-		self.set.insert(SetConstraints::PADDING_RIGHT);
-	}
-
-	pub fn set_horizontal_padding(&mut self, padding: f32) {
-		self.set_padding_left(padding);
-		self.set_padding_right(padding);
-	}
-
-	pub fn set_vertical_padding(&mut self, padding: f32) {
-		self.set_padding_top(padding);
-		self.set_padding_bottom(padding);
-	}
-
-	pub fn set_padding(&mut self, padding: impl Into<BoxLengths>) {
-		self.padding = padding.into();
-		self.set.insert(SetConstraints::ALL_PADDING);
+		self.set_width(size.x);
+		self.set_height(size.y);
 	}
 }
 
 
 impl LayoutConstraints {
 	pub fn desired_width(&self) -> f32 {
-		resolve_length(self.min_width, self.max_width, self.content_width, (self.padding.left, self.padding.right))
+		let padding_total = self.padding.horizontal_sum();
+		(self.preferred_width.get() + padding_total).clamp(self.min_width.get(), self.max_width.get()) 
 	}
 
 	pub fn desired_height(&self) -> f32 {
-		resolve_length(self.min_height, self.max_height, self.content_height, (self.padding.top, self.padding.bottom))
+		let padding_total = self.padding.vertical_sum();
+		(self.preferred_height.get() + padding_total).clamp(self.min_height.get(), self.max_height.get()) 
 	}
 
-	pub fn is_set(&self, constraints: SetConstraints) -> bool {
-		self.set.contains(constraints)
+	pub fn outer_min_width(&self) -> f32 {
+		self.min_width.get().max(self.padding.horizontal_sum()) + self.margin.horizontal_sum()
 	}
 
-	pub fn set_default(&mut self, constraints: SetConstraints, f: impl FnOnce(&mut Self)) {
-		if !self.set.contains(constraints) {
-			f(self);
-			self.set.insert(constraints);
-		}
+	pub fn outer_min_height(&self) -> f32 {
+		self.min_height.get().max(self.padding.vertical_sum()) + self.margin.vertical_sum()
+	}
+
+	pub fn outer_desired_width(&self) -> f32 {
+		self.desired_width() + self.margin.horizontal_sum()
 	}
 }
 
@@ -239,14 +228,95 @@ impl LayoutConstraints {
 
 
 
-pub fn layout(
+pub fn layout_children(
 	available_bounds: Aabb2,
 	widgets: &[WidgetId],
 	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
-	widget_boxes: &mut SecondaryMap<WidgetId, WidgetBox>)
+	layouts: &mut SecondaryMap<WidgetId, Layout>)
 {
+	if widgets.is_empty() {
+		return;
+	}
+
+	let mut total_min_width = 0.0f32;
+	let mut total_preferred_width = 0.0f32;
+
+	for &widget_id in widgets {
+		let constraints = &constraints[widget_id];
+
+		let min_width = constraints.outer_min_width();
+		let preferred_width = constraints.outer_desired_width();
+
+		total_min_width += min_width;
+		total_preferred_width += preferred_width;
+
+		layouts.insert(widget_id, Layout::default());
+	}
+
+	let available_width = available_bounds.width();
+	let widget_count = widgets.len();
+
 	let mut cursor = available_bounds.min_max_corner();
-	let mut prev_margin = 0.0f32;
+
+	if available_width <= total_min_width {
+		// Every widget takes min_size
+		for &widget_id in widgets {
+			let constraints = &constraints[widget_id];
+
+			let padding_width = constraints.min_width.get();
+			let padding_height = constraints.desired_height();
+
+			let margin_box_tl = cursor + Vec2::new(constraints.margin.left.get(), -constraints.margin.top.get());
+			let min_pos = margin_box_tl - Vec2::from_y(padding_height);
+			let max_pos = margin_box_tl + Vec2::from_x(padding_width);
+
+			cursor.x = max_pos.x + constraints.margin.right.get();
+
+			let box_bounds = Aabb2::new(min_pos, max_pos);
+			let content_bounds = inset_lengths(&box_bounds, &constraints.padding);
+			let margin_bounds = outset_lengths(&box_bounds, &constraints.margin);
+
+			let layout = &mut layouts[widget_id];
+			layout.box_bounds = box_bounds;
+			layout.content_bounds = content_bounds;
+			layout.margin_bounds = margin_bounds;
+		}
+
+		return;
+	}
+
+	if available_width <= total_preferred_width {
+		let total_weight = total_preferred_width - total_min_width;
+		assert!(total_weight > 0.0);
+
+		// Every widget shrinks proportionally from preferred_size to min_size
+		for &widget_id in widgets {
+			let constraints = &constraints[widget_id];
+
+			let weight = constraints.outer_desired_width() - constraints.outer_min_width();
+			let extra_width = weight / total_weight * (available_width - total_min_width);
+
+			let padding_width = constraints.min_width.get() + extra_width;
+			let padding_height = constraints.desired_height();
+
+			let margin_box_tl = cursor + Vec2::new(constraints.margin.left.get(), -constraints.margin.top.get());
+			let min_pos = margin_box_tl - Vec2::from_y(padding_height);
+			let max_pos = margin_box_tl + Vec2::from_x(padding_width);
+
+			cursor.x = max_pos.x + constraints.margin.right.get();
+
+			let box_bounds = Aabb2::new(min_pos, max_pos);
+			let content_bounds = inset_lengths(&box_bounds, &constraints.padding);
+			let margin_bounds = outset_lengths(&box_bounds, &constraints.margin);
+
+			let layout = &mut layouts[widget_id];
+			layout.box_bounds = box_bounds;
+			layout.content_bounds = content_bounds;
+			layout.margin_bounds = margin_bounds;
+		}
+
+		return;
+	}
 
 	for &widget_id in widgets {
 		let constraints = &constraints[widget_id];
@@ -254,37 +324,28 @@ pub fn layout(
 		let padding_width = constraints.desired_width();
 		let padding_height = constraints.desired_height();
 
-		let margin_advance = prev_margin.max(constraints.margin.left);
-		prev_margin = constraints.margin.right;
-
-		let margin_box_tl = cursor + Vec2::new(margin_advance, -constraints.margin.top);
+		let margin_box_tl = cursor + Vec2::new(constraints.margin.left.get(), -constraints.margin.top.get());
 		let min_pos = margin_box_tl - Vec2::from_y(padding_height);
 		let max_pos = margin_box_tl + Vec2::from_x(padding_width);
 
-		cursor.x = max_pos.x;
+		cursor.x = max_pos.x + constraints.margin.right.get();
 
 		let box_bounds = Aabb2::new(min_pos, max_pos);
 		let content_bounds = inset_lengths(&box_bounds, &constraints.padding);
 		let margin_bounds = outset_lengths(&box_bounds, &constraints.margin);
 
-		widget_boxes.insert(widget_id, WidgetBox {
-			box_bounds,
-			content_bounds,
-			margin_bounds,
-		});
+		let layout = &mut layouts[widget_id];
+		layout.box_bounds = box_bounds;
+		layout.content_bounds = content_bounds;
+		layout.margin_bounds = margin_bounds;
 	}
 }
 
 
-fn resolve_length(min: f32, max: f32, content: f32, padding: (f32, f32)) -> f32 {
-	let padding_total = padding.0 + padding.1;
-	(content + padding_total).clamp(min, max) 
-}
 
-
-fn inset_lengths(bounds: &Aabb2, lengths: &BoxLengths) -> Aabb2 {
-	let min = bounds.min + Vec2::new(lengths.left, lengths.bottom);
-	let max = bounds.max - Vec2::new(lengths.right, lengths.top);
+pub fn inset_lengths(bounds: &Aabb2, lengths: &BoxLengths) -> Aabb2 {
+	let min = bounds.min + Vec2::new(lengths.left.get(), lengths.bottom.get());
+	let max = bounds.max - Vec2::new(lengths.right.get(), lengths.top.get());
 
 	Aabb2::new(
 		Vec2::new(min.x.min(max.x), min.y.min(max.y)),
@@ -292,12 +353,32 @@ fn inset_lengths(bounds: &Aabb2, lengths: &BoxLengths) -> Aabb2 {
 	)
 }
 
-fn outset_lengths(bounds: &Aabb2, lengths: &BoxLengths) -> Aabb2 {
-	let min = bounds.min - Vec2::new(lengths.left, lengths.bottom);
-	let max = bounds.max + Vec2::new(lengths.right, lengths.top);
+pub fn outset_lengths(bounds: &Aabb2, lengths: &BoxLengths) -> Aabb2 {
+	let min = bounds.min - Vec2::new(lengths.left.get(), lengths.bottom.get());
+	let max = bounds.max + Vec2::new(lengths.right.get(), lengths.top.get());
 
 	Aabb2::new(
 		Vec2::new(min.x.min(max.x), min.y.min(max.y)),
 		Vec2::new(min.x.max(max.x), min.y.max(max.y))
 	)
+}
+
+
+
+#[derive(Debug, Clone)]
+pub struct Layout {
+
+	pub box_bounds: Aabb2,
+	pub margin_bounds: Aabb2,
+	pub content_bounds: Aabb2,
+}
+
+impl Default for Layout {
+	fn default() -> Self {
+		Layout {
+			box_bounds: Aabb2::zero(),
+			margin_bounds: Aabb2::zero(),
+			content_bounds: Aabb2::zero(),
+		}
+	}
 }
