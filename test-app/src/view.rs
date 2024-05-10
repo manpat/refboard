@@ -76,7 +76,13 @@ impl View {
 		self.ui.run(view_bounds.shrink(Vec2::splat(20.0)), painter, |ui| {
 			ui.dummy();
 			ui.dummy();
-			ui.dummy();
+
+			let wdg = ui.add_widget(ui::BoxLayout{});
+			ui.add_widget_to((), wdg);
+			
+			let wdg2 = ui.add_widget_to(ui::BoxLayout{}, wdg);
+			ui.add_widget_to((), wdg2);
+
 			ui.dummy();
 		});
 

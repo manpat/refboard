@@ -160,5 +160,6 @@ fn to_point(Vec2{x,y}: Vec2) -> Point {
 
 fn to_box(Aabb2{min, max}: Aabb2) -> Box2D {
 	// TODO(pat.m): make this more intentional
-	Box2D::new(to_point(min.ceil() - Vec2::splat(0.5)), to_point(max.floor() + Vec2::splat(0.5)))
+	// Box2D::new(to_point(min.ceil() - Vec2::splat(0.5)), to_point(max.floor() + Vec2::splat(0.5)))
+	Box2D::new(to_point(min.floor() + Vec2::splat(0.5)), to_point(max.floor() + Vec2::splat(0.5)))
 }
