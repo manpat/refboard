@@ -244,7 +244,6 @@ pub fn layout_children(
 	}
 
 	let available_width = available_bounds.width();
-	let widget_count = widgets.len();
 
 	let mut total_min_width = 0.0f32;
 	let mut total_preferred_width = 0.0f32;
@@ -338,7 +337,11 @@ pub fn layout_children(
 
 		let padding_width = {
 			let weight = max_width - constraints.outer_desired_width();
-			let extra_width = weight / total_weight * spare_space;
+			let extra_width = if total_weight > 0.0 {
+				weight / total_weight * spare_space
+			} else {
+				0.0
+			};
 
 			constraints.desired_width() + extra_width
 		};

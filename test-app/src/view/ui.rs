@@ -174,8 +174,8 @@ impl Widget for () {
 		ctx.constraints.min_width.set_default(10.0);
 		ctx.constraints.min_height.set_default(10.0);
 
-		ctx.constraints.max_width.set_default(100.0);
-		ctx.constraints.max_height.set_default(100.0);
+		ctx.constraints.max_width.set_default(50.0);
+		// ctx.constraints.max_height.set_default(50.0);
 	}
 }
 
