@@ -166,16 +166,18 @@ pub trait Widget : std::fmt::Debug {
 
 impl Widget for () {
 	fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
-		ctx.constraints.margin.set_default(4.0);
-		ctx.constraints.padding.set_default(4.0);
+		ctx.constraints.margin.set_default(16.0);
+		ctx.constraints.padding.set_default(16.0);
 
-		ctx.constraints.preferred_width.set_default(50.0);
-		ctx.constraints.preferred_height.set_default(50.0);
-		ctx.constraints.min_width.set_default(10.0);
-		ctx.constraints.min_height.set_default(10.0);
+		// ctx.constraints.preferred_width.set_default(50.0);
+		// ctx.constraints.preferred_height.set_default(50.0);
+		// ctx.constraints.min_width.set_default(10.0);
+		// ctx.constraints.min_height.set_default(10.0);
 
-		ctx.constraints.max_width.set_default(50.0);
+		// ctx.constraints.max_width.set_default(50.0);
 		// ctx.constraints.max_height.set_default(50.0);
+
+		ctx.constraints.horizontal_size_policy.set_default(SizingBehaviour::FLEXIBLE);
 	}
 }
 
@@ -187,7 +189,9 @@ impl Widget for BoxLayout {
 	fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
 		let ConstraintContext { constraints, children, constraint_map } = ctx;
 
-		let padding = 16.0f32;
+		constraints.padding.set_default(8.0);
+		let padding_x = constraints.padding.horizontal_sum();
+		let padding_y = constraints.padding.vertical_sum();
 
 		let mut total_min_width = 0.0f32;
 		let mut total_min_height = 0.0f32;
@@ -198,26 +202,31 @@ impl Widget for BoxLayout {
 		for &child in children {
 			let child_constraints = &constraint_map[child];
 
-			let min_width = child_constraints.outer_min_width();
-			let preferred_width = child_constraints.outer_desired_width();
+			let margin_x = child_constraints.margin.horizontal_sum();
+			let margin_y = child_constraints.margin.vertical_sum();
 
-			total_min_width += min_width;
-			total_preferred_width += preferred_width;
+			let min_width = child_constraints.min_width();
+			let preferred_width = child_constraints.preferred_width();
 
-			total_min_height = total_min_height.max(child_constraints.outer_min_height());
+			total_min_width += min_width + margin_x;
+			total_preferred_width += preferred_width + margin_x;
 
-			let child_height = child_constraints.desired_height();
-			total_preferred_height = total_preferred_height.max(child_height + child_constraints.margin.vertical_sum());
+			total_min_height = total_min_height.max(child_constraints.min_height() + margin_y);
+			total_preferred_height = total_preferred_height.max(child_constraints.preferred_height() + margin_y);
 		}
 
-		total_min_width += 2.0 * padding;
-		total_min_height += 2.0 * padding;
+		total_min_width += padding_x;
+		total_min_height += padding_y;
+
+		total_preferred_width += padding_x;
+		total_preferred_height += padding_y;
 
 		constraints.preferred_width.set_default(total_preferred_width);
 		constraints.preferred_height.set_default(total_preferred_height);
 		constraints.min_width.set_default(total_min_width);
 		constraints.min_height.set_default(total_min_height);
-		constraints.padding.set_default(padding);
+
+		constraints.horizontal_size_policy.set_default(SizingBehaviour::FLEXIBLE);
 		// constraints.margin = BoxLengths::from(4.0);
 	}
 

@@ -128,10 +128,25 @@ impl From<(f32, f32)> for BoxLengths {
 	}
 }
 
-// #[derive(Debug, Clone, Copy)]
-// pub enum SizingBehaviour {
-// 	Normal,
-// }
+bitflags! {
+	#[derive(Debug, Clone, Copy)]
+	pub struct SizingBehaviour : u16 {
+		/// Allow > preferred - if there's spare space
+		const CAN_GROW = 1 << 0;
+
+		/// Allow < preferred - if not enough space
+		const CAN_SHRINK = 1 << 1;
+
+		/// Preferred from content sizes
+		// CONTENT,
+
+		/// Min == Max == Preferred
+		const FIXED = 0;
+
+		/// Grow and shrink to fill space between [min, max]
+		const FLEXIBLE = Self::CAN_GROW.bits() | Self::CAN_SHRINK.bits();
+	}
+}
 
 
 #[derive(Debug, Clone)]
@@ -149,8 +164,8 @@ pub struct LayoutConstraints {
 	pub margin: BoxLengths,
 	pub padding: BoxLengths,
 
-	// pub horizontal_size_policy: WidgetParameter<SizingBehaviour>,
-	// pub vertical_size_policy: WidgetParameter<SizingBehaviour>,
+	pub horizontal_size_policy: WidgetParameter<SizingBehaviour>,
+	pub vertical_size_policy: WidgetParameter<SizingBehaviour>,
 
 	// TODO(pat.m): baselines??
 
@@ -177,8 +192,8 @@ impl Default for LayoutConstraints {
 			margin: BoxLengths::default(),
 			padding: BoxLengths::default(),
 
-			// horizontal_size_policy: WidgetParameter::new(SizePolicy::PREFERRED),
-			// vertical_size_policy: WidgetParameter::new(SizePolicy::PREFERRED),
+			horizontal_size_policy: WidgetParameter::new(SizingBehaviour::FLEXIBLE),
+			vertical_size_policy: WidgetParameter::new(SizingBehaviour::FLEXIBLE),
 		}
 	}
 }
@@ -202,30 +217,56 @@ impl LayoutConstraints {
 
 
 impl LayoutConstraints {
-	pub fn desired_width(&self) -> f32 {
-		let padding_total = self.padding.horizontal_sum();
-		(self.preferred_width.get() + padding_total).clamp(self.min_width.get(), self.max_width.get()) 
+	pub fn min_width(&self) -> f32 {
+		let min_width = self.min_width.get().max(self.padding.horizontal_sum());
+
+		if self.horizontal_size_policy.get().contains(SizingBehaviour::CAN_SHRINK) {
+			min_width
+		} else {
+			self.preferred_width()
+		}
 	}
 
-	pub fn desired_height(&self) -> f32 {
-		let padding_total = self.padding.vertical_sum();
-		(self.preferred_height.get() + padding_total).clamp(self.min_height.get(), self.max_height.get()) 
+	pub fn max_width(&self) -> f32 {
+		let max_width = self.max_width.get().max(self.padding.horizontal_sum());
+
+		if self.horizontal_size_policy.get().contains(SizingBehaviour::CAN_GROW) {
+			max_width
+		} else {
+			self.preferred_width()
+		}
 	}
 
-	pub fn outer_min_width(&self) -> f32 {
-		self.min_width.get().max(self.padding.horizontal_sum()) + self.margin.horizontal_sum()
+	pub fn min_height(&self) -> f32 {
+		let min_height = self.min_height.get().max(self.padding.vertical_sum());
+
+		if self.vertical_size_policy.get().contains(SizingBehaviour::CAN_SHRINK) {
+			min_height
+		} else {
+			self.preferred_height()
+		}
 	}
 
-	pub fn outer_min_height(&self) -> f32 {
-		self.min_height.get().max(self.padding.vertical_sum()) + self.margin.vertical_sum()
+	pub fn max_height(&self) -> f32 {
+		let max_height = self.max_height.get().max(self.padding.vertical_sum());
+
+		if self.vertical_size_policy.get().contains(SizingBehaviour::CAN_GROW) {
+			max_height
+		} else {
+			self.preferred_height()
+		}
 	}
 
-	pub fn outer_desired_width(&self) -> f32 {
-		self.desired_width() + self.margin.horizontal_sum()
+	pub fn preferred_width(&self) -> f32 {
+		self.preferred_width.get()
+			.clamp(self.min_width.get(), self.max_width.get())
+			.max(self.padding.horizontal_sum())
 	}
 
-	pub fn outer_max_width(&self) -> f32 {
-		self.max_width.get() + self.margin.horizontal_sum()
+	pub fn preferred_height(&self) -> f32 {
+		self.preferred_height.get()
+			.clamp(self.min_height.get(), self.max_height.get())
+			.max(self.padding.vertical_sum())
 	}
 }
 
@@ -248,109 +289,119 @@ pub fn layout_children(
 	let mut total_min_width = 0.0f32;
 	let mut total_preferred_width = 0.0f32;
 	let mut total_max_width = 0.0f32;
+	let mut total_margins = 0.0f32;
+
+	let mut num_unconstrained_growable_widgets = 0;
 
 	for &widget_id in widgets {
 		let constraints = &constraints[widget_id];
 
-		let min_width = constraints.outer_min_width();
-		let preferred_width = constraints.outer_desired_width();
+		let margin = constraints.margin.horizontal_sum();
 
-		let max_width = constraints.outer_max_width().min(available_width);
-		total_max_width += max_width;
+		let min_width = constraints.min_width().max(0.0);
+		let preferred_width = constraints.preferred_width();
+		let max_width = constraints.max_width();
+
+		if max_width.is_finite() {
+			total_max_width += max_width;
+		} else {
+			num_unconstrained_growable_widgets += 1;
+		}
 
 		total_min_width += min_width;
 		total_preferred_width += preferred_width;
+		total_margins += margin;
 
 		layouts.insert(widget_id, Layout::default());
 	}
 
-	let mut cursor = available_bounds.min_max_corner();
+	let max_constrained_width = available_width - total_margins;
+	total_max_width += num_unconstrained_growable_widgets as f32 * max_constrained_width;
 
-	if available_width <= total_min_width {
+
+
+	if available_width <= total_min_width + total_margins {
 		// Every widget takes min_size
 		for &widget_id in widgets {
 			let constraints = &constraints[widget_id];
-
-			let padding_width = constraints.min_width.get();
-			let padding_height = constraints.desired_height();
-
-			let margin_box_tl = cursor + Vec2::new(constraints.margin.left.get(), -constraints.margin.top.get());
-			let min_pos = margin_box_tl - Vec2::from_y(padding_height);
-			let max_pos = margin_box_tl + Vec2::from_x(padding_width);
-
-			cursor.x = max_pos.x + constraints.margin.right.get();
-
-			let box_bounds = Aabb2::new(min_pos, max_pos);
-			let content_bounds = inset_lengths(&box_bounds, &constraints.padding);
-			let margin_bounds = outset_lengths(&box_bounds, &constraints.margin);
-
 			let layout = &mut layouts[widget_id];
-			layout.box_bounds = box_bounds;
-			layout.content_bounds = content_bounds;
-			layout.margin_bounds = margin_bounds;
+
+			layout.size.x = constraints.min_width();
+			layout.size.y = constraints.preferred_height();
+
 		}
 
+		position_layouts(available_bounds, widgets, constraints, layouts);
+		
 		return;
 	}
 
-	if available_width <= total_preferred_width {
+	// available_width > total_min_width + total_margins 
+
+	if available_width <= total_preferred_width + total_margins {
 		let total_weight = total_preferred_width - total_min_width;
-		assert!(total_weight > 0.0);
+		let spare_space = available_width - total_margins - total_min_width;
 
 		// Every widget shrinks proportionally from preferred_size to min_size
 		for &widget_id in widgets {
 			let constraints = &constraints[widget_id];
-
-			let weight = constraints.outer_desired_width() - constraints.outer_min_width();
-			let extra_width = weight / total_weight * (available_width - total_min_width);
-
-			let padding_width = constraints.min_width.get() + extra_width;
-			let padding_height = constraints.desired_height();
-
-			let margin_box_tl = cursor + Vec2::new(constraints.margin.left.get(), -constraints.margin.top.get());
-			let min_pos = margin_box_tl - Vec2::from_y(padding_height);
-			let max_pos = margin_box_tl + Vec2::from_x(padding_width);
-
-			cursor.x = max_pos.x + constraints.margin.right.get();
-
-			let box_bounds = Aabb2::new(min_pos, max_pos);
-			let content_bounds = inset_lengths(&box_bounds, &constraints.padding);
-			let margin_bounds = outset_lengths(&box_bounds, &constraints.margin);
-
 			let layout = &mut layouts[widget_id];
-			layout.box_bounds = box_bounds;
-			layout.content_bounds = content_bounds;
-			layout.margin_bounds = margin_bounds;
+
+			let weight = constraints.preferred_width() - constraints.min_width();
+			let extra_width = weight / total_weight * spare_space;
+
+			layout.size.x = constraints.min_width() + extra_width;
+			layout.size.y = constraints.preferred_height();
 		}
+
+		position_layouts(available_bounds, widgets, constraints, layouts);
 
 		return;
 	}
 
-	// available_width > total_preferred_width
+	// available_width > total_preferred_width + total_margins
 	let total_weight = total_max_width - total_preferred_width;
-	let spare_space = available_width - total_preferred_width;
+	let spare_space = available_width - total_margins - total_preferred_width;
 
 	for &widget_id in widgets {
 		let constraints = &constraints[widget_id];
+		let layout = &mut layouts[widget_id];
 
-		let max_width = constraints.outer_max_width().min(available_width);
+		let max_width = constraints.max_width();
+		let max_width_constrained = max_width.min(max_constrained_width);
 
-		let padding_width = {
-			let weight = max_width - constraints.outer_desired_width();
+		layout.size.x = {
+			let weight = max_width_constrained - constraints.preferred_width();
 			let extra_width = if total_weight > 0.0 {
 				weight / total_weight * spare_space
 			} else {
 				0.0
 			};
 
-			constraints.desired_width() + extra_width
+			(constraints.preferred_width() + extra_width.max(0.0))
+				.min(max_width)
 		};
 
-		let padding_height = constraints.desired_height();
+		layout.size.y = constraints.preferred_height();
+	}
 
+	position_layouts(available_bounds, widgets, constraints, layouts);
+}
+
+
+fn position_layouts(available_bounds: Aabb2,
+	widgets: &[WidgetId],
+	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
+	layouts: &mut SecondaryMap<WidgetId, Layout>)
+{
+	let mut cursor = available_bounds.min_max_corner();
+
+	for &widget_id in widgets {
+		let constraints = &constraints[widget_id];
+		let layout = &mut layouts[widget_id];
 		let margin_box_tl = cursor + Vec2::new(constraints.margin.left.get(), -constraints.margin.top.get());
-		let min_pos = margin_box_tl - Vec2::from_y(padding_height);
-		let max_pos = margin_box_tl + Vec2::from_x(padding_width);
+		let min_pos = margin_box_tl - Vec2::from_y(layout.size.y);
+		let max_pos = margin_box_tl + Vec2::from_x(layout.size.x);
 
 		cursor.x = max_pos.x + constraints.margin.right.get();
 
@@ -358,12 +409,12 @@ pub fn layout_children(
 		let content_bounds = inset_lengths(&box_bounds, &constraints.padding);
 		let margin_bounds = outset_lengths(&box_bounds, &constraints.margin);
 
-		let layout = &mut layouts[widget_id];
 		layout.box_bounds = box_bounds;
 		layout.content_bounds = content_bounds;
 		layout.margin_bounds = margin_bounds;
 	}
 }
+
 
 
 
@@ -391,6 +442,7 @@ pub fn outset_lengths(bounds: &Aabb2, lengths: &BoxLengths) -> Aabb2 {
 
 #[derive(Debug, Clone)]
 pub struct Layout {
+	pub size: Vec2,
 
 	pub box_bounds: Aabb2,
 	pub margin_bounds: Aabb2,
@@ -400,6 +452,8 @@ pub struct Layout {
 impl Default for Layout {
 	fn default() -> Self {
 		Layout {
+			size: Vec2::zero(),
+
 			box_bounds: Aabb2::zero(),
 			margin_bounds: Aabb2::zero(),
 			content_bounds: Aabb2::zero(),

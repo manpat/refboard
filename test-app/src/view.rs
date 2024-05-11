@@ -74,49 +74,81 @@ impl View {
 		// painter.rect(menu_bounds, [0.02; 3]);
 
 		self.ui.run(view_bounds.shrink(Vec2::splat(20.0)), painter, |ui| {
-			ui.dummy();
+			use ui::SizingBehaviour;
+
+			// ui.dummy();
 			ui.mutate_widget_constraints(ui.add_widget(()), |lc| {
-				lc.max_width.set(250.0);
-			});
-			ui.dummy();
-
-			ui.mutate_widget_constraints(ui.add_widget(()), |lc| {
-				lc.set_width(75.0);
-				lc.set_height(120.0);
-				lc.margin.set_vertical(10.0);
-			});
-
-			let wdg = ui.add_widget(ui::BoxLayout{});
-			ui.add_widget_to((), wdg);
-			
-			let wdg2 = ui.add_widget_to(ui::BoxLayout{}, wdg);
-			ui.add_widget_to((), wdg2);
-
-			ui.mutate_widget_constraints(wdg, |lc| {
-				// lc.min_height.set(100.0);
-				lc.margin.set_vertical(10.0);
-				lc.margin.set_horizontal(20.0);
-			});
-
-			ui.dummy();
-
-
-			let wdg3 = ui.add_widget(());
-			ui.mutate_widget_constraints(wdg3, |lc| {
-				lc.min_width.set(50.0);
-				lc.max_width.set(f32::INFINITY);
 				lc.preferred_width.set(100.0);
-				lc.preferred_height.set(75.0);
+				// lc.min_width.set(20.0);
+				lc.max_width.set(250.0);
+				lc.horizontal_size_policy.set(SizingBehaviour::CAN_GROW);
 			});
 
-			let wdg3 = ui.add_widget(());
-			ui.mutate_widget_constraints(wdg3, |lc| {
-				lc.min_width.set(25.0);
-				lc.max_width.set(1000.0);
-				lc.preferred_width.set(200.0);
-				lc.preferred_height.set(100.0);
+			ui.mutate_widget_constraints(ui.add_widget(()), |lc| {
+				lc.preferred_width.set(100.0);
+				lc.min_width.set(20.0);
+				// lc.max_width.set(250.0);
+				lc.horizontal_size_policy.set(SizingBehaviour::CAN_SHRINK);
 			});
+
+			ui.mutate_widget_constraints(ui.add_widget(()), |lc| {
+				lc.min_width.set(10.0);
+				// lc.preferred_width.set(10.0);
+				lc.horizontal_size_policy.set(SizingBehaviour::FLEXIBLE);
+			});
+
+			ui.mutate_widget_constraints(ui.add_widget(()), |lc| {
+				lc.set_width(100.0);
+				lc.set_height(120.0);
+				lc.horizontal_size_policy.set(SizingBehaviour::FIXED);
+			});
+
+			let inner_layout = ui.add_widget(ui::BoxLayout{});
+			ui.mutate_widget_constraints(inner_layout, |lc| {
+				// lc.min_width.set(50.0);
+				// lc.min_height.set(50.0);
+				// lc.preferred_width.set(100.0);
+				// lc.preferred_height.set(100.0);
+				lc.horizontal_size_policy.set(SizingBehaviour::CAN_GROW);
+				lc.padding.set_vertical(20.0);
+				lc.padding.set_horizontal(20.0);
+			});
+
+
+			ui.add_widget_to((), inner_layout);
+			ui.add_widget_to((), inner_layout);
+			ui.add_widget_to((), inner_layout);
+			
+			// let inner_inner_layout = ui.add_widget_to(ui::BoxLayout{}, inner_layout);
+			// ui.mutate_widget_constraints(inner_inner_layout, |lc| {
+			// 	lc.horizontal_size_policy.set(SizingBehaviour::FIXED);
+			// });
+
+			// ui.add_widget_to((), inner_inner_layout);
+
+
+			// ui.dummy();
+
+
+			// let wdg3 = ui.add_widget(());
+			// ui.mutate_widget_constraints(wdg3, |lc| {
+			// 	lc.min_width.set(50.0);
+			// 	lc.max_width.set(f32::INFINITY);
+			// 	lc.horizontal_size_policy.set(SizingBehaviour::FLEXIBLE);
+			// 	lc.preferred_width.set(100.0);
+			// 	lc.preferred_height.set(75.0);
+			// });
+
+			// let wdg3 = ui.add_widget(());
+			// ui.mutate_widget_constraints(wdg3, |lc| {
+			// 	lc.min_width.set(25.0);
+			// 	lc.max_width.set(1000.0);
+			// 	lc.horizontal_size_policy.set(SizingBehaviour::FLEXIBLE);
+			// 	lc.preferred_width.set(200.0);
+			// 	lc.preferred_height.set(100.0);
+			// });
 		});
+
 
 		// Cursor
 		if let Some(cursor_pos) = self.input.cursor_pos_view {

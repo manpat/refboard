@@ -825,8 +825,7 @@ checksum = "90ed8c1e510134f979dbc4f070f87d4313098b704861a105fe34231c70a3901c"
 [[package]]
 name = "lyon"
 version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91e7f9cda98b5430809e63ca5197b06c7d191bf7e26dfc467d5a3f0290e2a74f"
+source = "git+https://github.com/manpat/lyon.git#0118768e24624de89f49f85ea835dca06a5253a5"
 dependencies = [
  "lyon_algorithms",
  "lyon_extra",
@@ -836,8 +835,7 @@ dependencies = [
 [[package]]
 name = "lyon_algorithms"
 version = "1.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3bca95f9a4955b3e4a821fbbcd5edfbd9be2a9a50bb5758173e5358bfb4c623"
+source = "git+https://github.com/manpat/lyon.git#0118768e24624de89f49f85ea835dca06a5253a5"
 dependencies = [
  "lyon_path",
  "num-traits",
@@ -845,18 +843,17 @@ dependencies = [
 
 [[package]]
 name = "lyon_extra"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9ce2ae38f2480094ec1f0d5df51a75581fa84f0e8f32a0edb1d264630c99f3b"
+version = "1.0.2"
+source = "git+https://github.com/manpat/lyon.git#0118768e24624de89f49f85ea835dca06a5253a5"
 dependencies = [
  "lyon_path",
+ "thiserror",
 ]
 
 [[package]]
 name = "lyon_geom"
 version = "1.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edecfb8d234a2b0be031ab02ebcdd9f3b9ee418fb35e265f7a540a48d197bff9"
+source = "git+https://github.com/manpat/lyon.git#0118768e24624de89f49f85ea835dca06a5253a5"
 dependencies = [
  "arrayvec",
  "euclid",
@@ -866,8 +863,7 @@ dependencies = [
 [[package]]
 name = "lyon_path"
 version = "1.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca507745ba7ccbc76e5c44e7b63b1a29d2b0d6126f375806a5bbaf657c7d6c45"
+source = "git+https://github.com/manpat/lyon.git#0118768e24624de89f49f85ea835dca06a5253a5"
 dependencies = [
  "lyon_geom",
  "num-traits",
@@ -875,9 +871,8 @@ dependencies = [
 
 [[package]]
 name = "lyon_tessellation"
-version = "1.0.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c7c67b5bc8123b352b2e7e742b47d1f236a13fe77619433be9568fbd888e9c0"
+version = "1.0.14"
+source = "git+https://github.com/manpat/lyon.git#0118768e24624de89f49f85ea835dca06a5253a5"
 dependencies = [
  "float_next_after",
  "lyon_path",
