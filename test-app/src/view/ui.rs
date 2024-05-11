@@ -34,6 +34,7 @@ type WidgetContainer = SlotMap<WidgetId, Box<dyn Widget>>;
 
 #[derive(Debug)]
 pub struct Ui {
+	// TODO(pat.m): most of this shouldn't be slotmaps - we never remove widgets within a frame so their index is stable
 	widgets: RefCell<WidgetContainer>,
 	hierarchy: RefCell<Hierarchy>,
 	stack: RefCell<Vec<WidgetId>>,

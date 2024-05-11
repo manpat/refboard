@@ -284,8 +284,56 @@ pub fn layout_children(
 		return;
 	}
 
-	size_layouts(available_bounds, widgets, constraints, layouts);
+	// TODO(pat.m): pls use slotmaps less - this is unnecessary
+	for &widget_id in widgets {
+		layouts.insert(widget_id, Layout::default());
+	}
+
+	// size_layouts(available_bounds, widgets, constraints, layouts);
+	size_layouts2(available_bounds, widgets, constraints, layouts);
 	position_layouts(available_bounds, widgets, constraints, layouts);
+}
+
+fn size_layouts2(available_bounds: Aabb2,
+	widgets: &[WidgetId],
+	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
+	layouts: &mut SecondaryMap<WidgetId, Layout>)
+{
+	let mut available_width = available_bounds.width();
+	let mut total_weight = widgets.len() as f32;
+
+	for &widget_id in widgets {
+		let constraints = &constraints[widget_id];
+		available_width -= constraints.margin.horizontal_sum();
+	}
+
+	'main: loop {
+		'current_pass: for &widget_id in widgets {
+			let layout = &mut layouts[widget_id];
+			if layout.final_size {
+				continue 'current_pass;
+			}
+
+			let constraints = &constraints[widget_id];
+
+			let allocated_width = available_width / total_weight;
+			let max_width = constraints.max_width();
+
+			let preferred_height = constraints.preferred_height();
+
+			if allocated_width > max_width {
+				layout.size = Vec2::new(max_width, preferred_height);
+				layout.final_size = true;
+				total_weight -= 1.0;
+				available_width -= max_width;
+				continue 'main;
+			} else {
+				layout.size = Vec2::new(allocated_width, preferred_height);
+			}
+		}
+
+		break
+	}
 }
 
 
@@ -321,8 +369,6 @@ fn size_layouts(available_bounds: Aabb2,
 		total_min_width += min_width;
 		total_preferred_width += preferred_width;
 		total_margins += margin;
-
-		layouts.insert(widget_id, Layout::default());
 	}
 
 	let max_constrained_width = available_width - total_margins;
@@ -334,10 +380,11 @@ fn size_layouts(available_bounds: Aabb2,
 		// Every widget takes min_size
 		for &widget_id in widgets {
 			let constraints = &constraints[widget_id];
-			let layout = &mut layouts[widget_id];
 
-			layout.size.x = constraints.min_width();
-			layout.size.y = constraints.preferred_height();
+			layouts[widget_id].size = Vec2::new(
+				constraints.min_width(),
+				constraints.preferred_height()
+			);
 		}
 
 		return;
@@ -352,13 +399,14 @@ fn size_layouts(available_bounds: Aabb2,
 		// Every widget shrinks proportionally from preferred_size to min_size
 		for &widget_id in widgets {
 			let constraints = &constraints[widget_id];
-			let layout = &mut layouts[widget_id];
 
 			let weight = constraints.preferred_width() - constraints.min_width();
 			let extra_width = weight / total_weight * spare_space;
 
-			layout.size.x = constraints.min_width() + extra_width;
-			layout.size.y = constraints.preferred_height();
+			layouts[widget_id].size = Vec2::new(
+				constraints.min_width() + extra_width,
+				constraints.preferred_height()
+			);
 		}
 
 		return;
@@ -370,7 +418,6 @@ fn size_layouts(available_bounds: Aabb2,
 
 	for &widget_id in widgets {
 		let constraints = &constraints[widget_id];
-		let layout = &mut layouts[widget_id];
 
 		let max_width = constraints.max_width();
 		let max_width_constrained = max_width.min(max_constrained_width);
@@ -382,8 +429,10 @@ fn size_layouts(available_bounds: Aabb2,
 			0.0
 		};
 
-		layout.size.x = (constraints.preferred_width() + extra_width.max(0.0)).min(max_width);
-		layout.size.y = constraints.preferred_height();
+		layouts[widget_id].size = Vec2::new(
+			(constraints.preferred_width() + extra_width.max(0.0)).min(max_width),
+			constraints.preferred_height()
+		);
 	}
 }
 
@@ -398,9 +447,12 @@ fn position_layouts(available_bounds: Aabb2,
 	for &widget_id in widgets {
 		let constraints = &constraints[widget_id];
 		let layout = &mut layouts[widget_id];
+
+		let size = layout.size; // .expect("Trying to position unsized widget");
+
 		let margin_box_tl = cursor + Vec2::new(constraints.margin.left.get(), -constraints.margin.top.get());
-		let min_pos = margin_box_tl - Vec2::from_y(layout.size.y);
-		let max_pos = margin_box_tl + Vec2::from_x(layout.size.x);
+		let min_pos = margin_box_tl - Vec2::from_y(size.y);
+		let max_pos = margin_box_tl + Vec2::from_x(size.x);
 
 		cursor.x = max_pos.x + constraints.margin.right.get();
 
@@ -442,6 +494,7 @@ pub fn outset_lengths(bounds: &Aabb2, lengths: &BoxLengths) -> Aabb2 {
 #[derive(Debug, Clone)]
 pub struct Layout {
 	pub size: Vec2,
+	pub final_size: bool,
 
 	pub box_bounds: Aabb2,
 	pub margin_bounds: Aabb2,
@@ -452,6 +505,7 @@ impl Default for Layout {
 	fn default() -> Self {
 		Layout {
 			size: Vec2::zero(),
+			final_size: false,
 
 			box_bounds: Aabb2::zero(),
 			margin_bounds: Aabb2::zero(),
