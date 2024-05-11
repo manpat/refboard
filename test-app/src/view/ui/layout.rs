@@ -284,6 +284,16 @@ pub fn layout_children(
 		return;
 	}
 
+	size_layouts(available_bounds, widgets, constraints, layouts);
+	position_layouts(available_bounds, widgets, constraints, layouts);
+}
+
+
+fn size_layouts(available_bounds: Aabb2,
+	widgets: &[WidgetId],
+	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
+	layouts: &mut SecondaryMap<WidgetId, Layout>)
+{
 	let available_width = available_bounds.width();
 
 	let mut total_min_width = 0.0f32;
@@ -328,11 +338,8 @@ pub fn layout_children(
 
 			layout.size.x = constraints.min_width();
 			layout.size.y = constraints.preferred_height();
-
 		}
 
-		position_layouts(available_bounds, widgets, constraints, layouts);
-		
 		return;
 	}
 
@@ -354,8 +361,6 @@ pub fn layout_children(
 			layout.size.y = constraints.preferred_height();
 		}
 
-		position_layouts(available_bounds, widgets, constraints, layouts);
-
 		return;
 	}
 
@@ -370,22 +375,16 @@ pub fn layout_children(
 		let max_width = constraints.max_width();
 		let max_width_constrained = max_width.min(max_constrained_width);
 
-		layout.size.x = {
-			let weight = max_width_constrained - constraints.preferred_width();
-			let extra_width = if total_weight > 0.0 {
-				weight / total_weight * spare_space
-			} else {
-				0.0
-			};
-
-			(constraints.preferred_width() + extra_width.max(0.0))
-				.min(max_width)
+		let weight = max_width_constrained - constraints.preferred_width();
+		let extra_width = if total_weight > 0.0 {
+			weight / total_weight * spare_space
+		} else {
+			0.0
 		};
 
+		layout.size.x = (constraints.preferred_width() + extra_width.max(0.0)).min(max_width);
 		layout.size.y = constraints.preferred_height();
 	}
-
-	position_layouts(available_bounds, widgets, constraints, layouts);
 }
 
 
