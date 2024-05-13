@@ -73,26 +73,30 @@ impl View {
 
 		// painter.rect(menu_bounds, [0.02; 3]);
 
-		self.ui.run(view_bounds.shrink(Vec2::splat(20.0)), painter, |ui| {
+		self.ui.run(view_bounds.shrink(Vec2::splat(10.0)), painter, |ui| {
 			use ui::SizingBehaviour;
 
-			// ui.dummy();
+			// // ui.dummy();
 			ui.mutate_widget_constraints(ui.add_widget(()), |lc| {
 				lc.preferred_width.set(100.0);
 				// lc.min_width.set(20.0);
 				lc.max_width.set(250.0);
+				lc.set_height(100.0);
 				lc.horizontal_size_policy.set(SizingBehaviour::CAN_GROW);
 			});
 
 			ui.mutate_widget_constraints(ui.add_widget(()), |lc| {
 				lc.preferred_width.set(100.0);
-				lc.min_width.set(20.0);
+				lc.min_width.set(40.0);
 				// lc.max_width.set(250.0);
+				lc.set_height(40.0);
 				lc.horizontal_size_policy.set(SizingBehaviour::CAN_SHRINK);
 			});
 
 			ui.mutate_widget_constraints(ui.add_widget(()), |lc| {
-				lc.min_width.set(10.0);
+				lc.min_width.set(40.0);
+				lc.max_width.set(250.0);
+				lc.set_height(64.0);
 				// lc.preferred_width.set(10.0);
 				lc.horizontal_size_policy.set(SizingBehaviour::FLEXIBLE);
 			});

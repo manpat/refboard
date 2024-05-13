@@ -218,40 +218,32 @@ impl LayoutConstraints {
 
 impl LayoutConstraints {
 	pub fn min_width(&self) -> f32 {
-		let min_width = self.min_width.get().max(self.padding.horizontal_sum());
-
 		if self.horizontal_size_policy.get().contains(SizingBehaviour::CAN_SHRINK) {
-			min_width
+			self.min_width.get().max(self.padding.horizontal_sum())
 		} else {
 			self.preferred_width()
 		}
 	}
 
 	pub fn max_width(&self) -> f32 {
-		let max_width = self.max_width.get().max(self.padding.horizontal_sum());
-
 		if self.horizontal_size_policy.get().contains(SizingBehaviour::CAN_GROW) {
-			max_width
+			self.max_width.get().max(self.padding.horizontal_sum())
 		} else {
 			self.preferred_width()
 		}
 	}
 
 	pub fn min_height(&self) -> f32 {
-		let min_height = self.min_height.get().max(self.padding.vertical_sum());
-
 		if self.vertical_size_policy.get().contains(SizingBehaviour::CAN_SHRINK) {
-			min_height
+			self.min_height.get().max(self.padding.vertical_sum())
 		} else {
 			self.preferred_height()
 		}
 	}
 
 	pub fn max_height(&self) -> f32 {
-		let max_height = self.max_height.get().max(self.padding.vertical_sum());
-
 		if self.vertical_size_policy.get().contains(SizingBehaviour::CAN_GROW) {
-			max_height
+			self.max_height.get().max(self.padding.vertical_sum())
 		} else {
 			self.preferred_height()
 		}
@@ -289,25 +281,27 @@ pub fn layout_children(
 		layouts.insert(widget_id, Layout::default());
 	}
 
-	// size_layouts(available_bounds, widgets, constraints, layouts);
-	size_layouts2(available_bounds, widgets, constraints, layouts);
+	size_layouts(available_bounds, widgets, constraints, layouts);
 	position_layouts(available_bounds, widgets, constraints, layouts);
 }
 
-fn size_layouts2(available_bounds: Aabb2,
+fn size_layouts(available_bounds: Aabb2,
 	widgets: &[WidgetId],
 	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
 	layouts: &mut SecondaryMap<WidgetId, Layout>)
 {
 	let mut available_width = available_bounds.width();
-	let mut total_weight = widgets.len() as f32;
+	let mut remaining_widgets = widgets.len();
 
 	for &widget_id in widgets {
 		let constraints = &constraints[widget_id];
 		available_width -= constraints.margin.horizontal_sum();
+		available_width -= constraints.min_width();
 	}
 
-	'main: loop {
+	'next_pass: loop {
+		let allocated_extra_width = (available_width / remaining_widgets as f32).max(0.0);
+
 		'current_pass: for &widget_id in widgets {
 			let layout = &mut layouts[widget_id];
 			if layout.final_size {
@@ -316,19 +310,21 @@ fn size_layouts2(available_bounds: Aabb2,
 
 			let constraints = &constraints[widget_id];
 
-			let allocated_width = available_width / total_weight;
+			let min_width = constraints.min_width();
 			let max_width = constraints.max_width();
-
+			let extra_width = max_width - min_width;
 			let preferred_height = constraints.preferred_height();
 
-			if allocated_width > max_width {
-				layout.size = Vec2::new(max_width, preferred_height);
+			if allocated_extra_width >= extra_width {
+				layout.size = Vec2::new(min_width + extra_width, preferred_height);
 				layout.final_size = true;
-				total_weight -= 1.0;
-				available_width -= max_width;
-				continue 'main;
+				remaining_widgets -= 1;
+				available_width -= extra_width;
+				continue 'next_pass;
+
 			} else {
-				layout.size = Vec2::new(allocated_width, preferred_height);
+				let extra_width = allocated_extra_width.min(extra_width);
+				layout.size = Vec2::new(min_width + extra_width, preferred_height);
 			}
 		}
 
@@ -336,105 +332,6 @@ fn size_layouts2(available_bounds: Aabb2,
 	}
 }
 
-
-fn size_layouts(available_bounds: Aabb2,
-	widgets: &[WidgetId],
-	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
-	layouts: &mut SecondaryMap<WidgetId, Layout>)
-{
-	let available_width = available_bounds.width();
-
-	let mut total_min_width = 0.0f32;
-	let mut total_preferred_width = 0.0f32;
-	let mut total_max_width = 0.0f32;
-	let mut total_margins = 0.0f32;
-
-	let mut num_unconstrained_growable_widgets = 0;
-
-	for &widget_id in widgets {
-		let constraints = &constraints[widget_id];
-
-		let margin = constraints.margin.horizontal_sum();
-
-		let min_width = constraints.min_width().max(0.0);
-		let preferred_width = constraints.preferred_width();
-		let max_width = constraints.max_width();
-
-		if max_width.is_finite() {
-			total_max_width += max_width;
-		} else {
-			num_unconstrained_growable_widgets += 1;
-		}
-
-		total_min_width += min_width;
-		total_preferred_width += preferred_width;
-		total_margins += margin;
-	}
-
-	let max_constrained_width = available_width - total_margins;
-	total_max_width += num_unconstrained_growable_widgets as f32 * max_constrained_width;
-
-
-
-	if available_width <= total_min_width + total_margins {
-		// Every widget takes min_size
-		for &widget_id in widgets {
-			let constraints = &constraints[widget_id];
-
-			layouts[widget_id].size = Vec2::new(
-				constraints.min_width(),
-				constraints.preferred_height()
-			);
-		}
-
-		return;
-	}
-
-	// available_width > total_min_width + total_margins 
-
-	if available_width <= total_preferred_width + total_margins {
-		let total_weight = total_preferred_width - total_min_width;
-		let spare_space = available_width - total_margins - total_min_width;
-
-		// Every widget shrinks proportionally from preferred_size to min_size
-		for &widget_id in widgets {
-			let constraints = &constraints[widget_id];
-
-			let weight = constraints.preferred_width() - constraints.min_width();
-			let extra_width = weight / total_weight * spare_space;
-
-			layouts[widget_id].size = Vec2::new(
-				constraints.min_width() + extra_width,
-				constraints.preferred_height()
-			);
-		}
-
-		return;
-	}
-
-	// available_width > total_preferred_width + total_margins
-	let total_weight = total_max_width - total_preferred_width;
-	let spare_space = available_width - total_margins - total_preferred_width;
-
-	for &widget_id in widgets {
-		let constraints = &constraints[widget_id];
-
-		let max_width = constraints.max_width();
-		let max_width_constrained = max_width.min(max_constrained_width);
-
-		let weight = max_width_constrained - constraints.preferred_width();
-		let extra_width = if total_weight > 0.0 {
-			weight / total_weight * spare_space
-		} else {
-			0.0
-		};
-
-		layouts[widget_id].size = Vec2::new(
-			(constraints.preferred_width() + extra_width.max(0.0)).min(max_width),
-			constraints.preferred_height()
-		);
-	}
-}
 
 
 fn position_layouts(available_bounds: Aabb2,
@@ -448,7 +345,7 @@ fn position_layouts(available_bounds: Aabb2,
 		let constraints = &constraints[widget_id];
 		let layout = &mut layouts[widget_id];
 
-		let size = layout.size; // .expect("Trying to position unsized widget");
+		let size = layout.size;
 
 		let margin_box_tl = cursor + Vec2::new(constraints.margin.left.get(), -constraints.margin.top.get());
 		let min_pos = margin_box_tl - Vec2::from_y(size.y);

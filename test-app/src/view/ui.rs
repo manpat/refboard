@@ -190,10 +190,6 @@ impl Widget for BoxLayout {
 	fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
 		let ConstraintContext { constraints, children, constraint_map } = ctx;
 
-		constraints.padding.set_default(8.0);
-		let padding_x = constraints.padding.horizontal_sum();
-		let padding_y = constraints.padding.vertical_sum();
-
 		let mut total_min_width = 0.0f32;
 		let mut total_min_height = 0.0f32;
 
@@ -215,6 +211,11 @@ impl Widget for BoxLayout {
 			total_min_height = total_min_height.max(child_constraints.min_height() + margin_y);
 			total_preferred_height = total_preferred_height.max(child_constraints.preferred_height() + margin_y);
 		}
+
+		constraints.padding.set_default(8.0);
+
+		let padding_x = constraints.padding.horizontal_sum();
+		let padding_y = constraints.padding.vertical_sum();
 
 		total_min_width += padding_x;
 		total_min_height += padding_y;
