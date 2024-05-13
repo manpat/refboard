@@ -120,10 +120,10 @@ impl Ui {
 			let content_bounds = self.widget_layouts[widget_id].content_bounds;
 			let constraints = &layout_constraints[widget_id];
 			let main_axis = constraints.layout_axis.get();
-			let item_alignment = constraints.item_alignment.get();
+			let content_alignment = constraints.content_alignment.get();
 
 			// TODO(pat.m): layout mode?
-			layout_children_linear(content_bounds, main_axis, item_alignment, children, &layout_constraints, &mut self.widget_layouts);
+			layout_children_linear(content_bounds, main_axis, content_alignment, children, &layout_constraints, &mut self.widget_layouts);
 		});
 	}
 

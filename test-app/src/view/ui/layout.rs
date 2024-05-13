@@ -220,12 +220,13 @@ pub struct LayoutConstraints {
 	pub layout_axis: WidgetParameter<Axis>,
 
 	/// Default alignment of child elements in this layout's cross axis.
-	pub item_alignment: WidgetParameter<Align>,
+	pub content_alignment: WidgetParameter<Align>,
 
 	/// Alignment of current element in the cross axis of the parent layout.
 	pub self_alignment: WidgetParameter<Align>,
 
 	// TODO(pat.m): baselines??
+	// TODO(pat.m): right justify/centre
 }
 
 impl Default for LayoutConstraints {
@@ -248,7 +249,7 @@ impl Default for LayoutConstraints {
 
 			layout_axis: WidgetParameter::new(Axis::Horizontal),
 
-			item_alignment: WidgetParameter::new(Align::Start),
+			content_alignment: WidgetParameter::new(Align::Start),
 			self_alignment: WidgetParameter::new(Align::Start),
 		}
 	}
@@ -360,7 +361,7 @@ impl LayoutConstraints {
 pub fn layout_children_linear(
 	available_bounds: Aabb2,
 	main_axis: Axis,
-	item_alignment: Align,
+	content_alignment: Align,
 	widgets: &[WidgetId],
 	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
 	layouts: &mut SecondaryMap<WidgetId, Layout>)
@@ -380,7 +381,7 @@ pub fn layout_children_linear(
 	size_layouts_overlapping(available_bounds, cross_axis, widgets, constraints, layouts);
 
 	position_layouts_linear(available_bounds, main_axis, widgets, constraints, layouts);
-	position_layouts_overlapping(available_bounds, cross_axis, item_alignment, widgets, constraints, layouts);
+	position_layouts_overlapping(available_bounds, cross_axis, content_alignment, widgets, constraints, layouts);
 
 	calculate_bounds(widgets, constraints, layouts);
 }
@@ -505,7 +506,7 @@ fn position_layouts_linear(available_bounds: Aabb2,
 
 fn position_layouts_overlapping(available_bounds: Aabb2,
 	axis: Axis,
-	item_alignment: Align,
+	content_alignment: Align,
 	widgets: &[WidgetId],
 	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
 	layouts: &mut SecondaryMap<WidgetId, Layout>)
@@ -519,7 +520,7 @@ fn position_layouts_overlapping(available_bounds: Aabb2,
 		let constraints = &constraints[widget_id];
 		let layout = &mut layouts[widget_id];
 
-		let alignment = constraints.self_alignment.get_or(item_alignment);
+		let alignment = constraints.self_alignment.get_or(content_alignment);
 
 		let (leading_margin, trailing_margin, length) = match axis {
 			Axis::Horizontal => (constraints.margin.left.get(), constraints.margin.right.get(), layout.size.x),

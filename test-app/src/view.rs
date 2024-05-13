@@ -92,7 +92,7 @@ impl View {
 				lc.horizontal_size_policy.set(SizingBehaviour::FLEXIBLE);
 				lc.vertical_size_policy.set(SizingBehaviour::FIXED);
 				lc.max_width.set(300.0);
-				lc.item_alignment.set(ui::Align::Middle);
+				lc.content_alignment.set(ui::Align::Middle);
 				lc.self_alignment.set(ui::Align::Middle);
 			});
 
@@ -135,34 +135,36 @@ impl View {
 			ui.add_widget_to((), inner_layout);
 			ui.add_widget_to((), inner_layout);
 			
-			// let inner_inner_layout = ui.add_widget_to(ui::BoxLayout{}, inner_layout);
-			// ui.mutate_widget_constraints(inner_inner_layout, |lc| {
-			// 	lc.horizontal_size_policy.set(SizingBehaviour::FIXED);
-			// });
+			let inner_inner_layout = ui.add_widget_to(ui::BoxLayout{ axis: ui::Axis::Horizontal }, inner_layout);
+			ui.mutate_widget_constraints(inner_inner_layout, |lc| {
+				lc.horizontal_size_policy.set(SizingBehaviour::FIXED);
+			});
 
-			// ui.add_widget_to((), inner_inner_layout);
-
-
-			// ui.dummy();
+			ui.add_widget_to((), inner_inner_layout);
 
 
-			// let wdg3 = ui.add_widget(());
-			// ui.mutate_widget_constraints(wdg3, |lc| {
-			// 	lc.min_width.set(50.0);
-			// 	lc.max_width.set(f32::INFINITY);
-			// 	lc.horizontal_size_policy.set(SizingBehaviour::FLEXIBLE);
-			// 	lc.preferred_width.set(100.0);
-			// 	lc.preferred_height.set(75.0);
-			// });
+			ui.dummy();
 
-			// let wdg3 = ui.add_widget(());
-			// ui.mutate_widget_constraints(wdg3, |lc| {
-			// 	lc.min_width.set(25.0);
-			// 	lc.max_width.set(1000.0);
-			// 	lc.horizontal_size_policy.set(SizingBehaviour::FLEXIBLE);
-			// 	lc.preferred_width.set(200.0);
-			// 	lc.preferred_height.set(100.0);
-			// });
+
+			let wdg3 = ui.add_widget(());
+			ui.mutate_widget_constraints(wdg3, |lc| {
+				lc.min_width.set(50.0);
+				lc.max_width.set(f32::INFINITY);
+				lc.horizontal_size_policy.set(SizingBehaviour::CAN_SHRINK);
+				lc.vertical_size_policy.set(SizingBehaviour::FIXED);
+				lc.preferred_width.set(100.0);
+				lc.preferred_height.set(75.0);
+			});
+
+			let wdg3 = ui.add_widget(());
+			ui.mutate_widget_constraints(wdg3, |lc| {
+				lc.min_width.set(25.0);
+				lc.max_width.set(1000.0);
+				lc.horizontal_size_policy.set(SizingBehaviour::FLEXIBLE);
+				lc.vertical_size_policy.set(SizingBehaviour::FIXED);
+				lc.preferred_width.set(200.0);
+				lc.preferred_height.set(100.0);
+			});
 		});
 
 
