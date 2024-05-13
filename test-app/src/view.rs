@@ -83,13 +83,17 @@ impl View {
 				lc.max_width.set(250.0);
 				lc.set_height(100.0);
 				lc.horizontal_size_policy.set(SizingBehaviour::CAN_GROW);
+
+				lc.self_alignment.set(ui::Align::Middle);
 			});
 
 			let inner_layout = ui.add_widget(ui::BoxLayout{ axis: ui::Axis::Vertical });
 			ui.mutate_widget_constraints(inner_layout, |lc| {
 				lc.horizontal_size_policy.set(SizingBehaviour::FLEXIBLE);
 				lc.vertical_size_policy.set(SizingBehaviour::FIXED);
-				lc.max_width.set(250.0);
+				lc.max_width.set(300.0);
+				lc.item_alignment.set(ui::Align::Middle);
+				lc.self_alignment.set(ui::Align::Middle);
 			});
 
 			ui.mutate_widget_constraints(ui.add_widget_to((), inner_layout), |lc| {
@@ -112,6 +116,7 @@ impl View {
 				lc.set_width(100.0);
 				lc.set_height(120.0);
 				lc.horizontal_size_policy.set(SizingBehaviour::FIXED);
+				lc.self_alignment.set(ui::Align::End);
 			});
 
 			let inner_layout = ui.add_widget(ui::BoxLayout{ axis: ui::Axis::Vertical });

@@ -111,17 +111,19 @@ impl Ui {
 		self.widget_layouts.set_capacity(num_widgets);
 
 		for &widget_id in hierarchy.root_nodes.iter() {
-			layout_children_linear(available_bounds, Axis::Horizontal, &[widget_id], &layout_constraints, &mut self.widget_layouts);
+			layout_children_linear(available_bounds, Axis::Horizontal, Align::Start, &[widget_id], &layout_constraints, &mut self.widget_layouts);
 		}
 
 		// top down resolve layouts and assign rects
 		hierarchy.visit_breadth_first(None, |widget_id, children| {
 			// this widget should already be laid out or root
 			let content_bounds = self.widget_layouts[widget_id].content_bounds;
-			let main_axis = layout_constraints[widget_id].children_layout_axis.get();
+			let constraints = &layout_constraints[widget_id];
+			let main_axis = constraints.layout_axis.get();
+			let item_alignment = constraints.item_alignment.get();
 
 			// TODO(pat.m): layout mode?
-			layout_children_linear(content_bounds, main_axis, children, &layout_constraints, &mut self.widget_layouts);
+			layout_children_linear(content_bounds, main_axis, item_alignment, children, &layout_constraints, &mut self.widget_layouts);
 		});
 	}
 
@@ -192,9 +194,9 @@ impl Widget for BoxLayout {
 	fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
 		let ConstraintContext { constraints, children, constraint_map } = ctx;
 
-		constraints.children_layout_axis.set_default(self.axis);
+		constraints.layout_axis.set_default(self.axis);
 
-		let main_axis = constraints.children_layout_axis.get();
+		let main_axis = constraints.layout_axis.get();
 		let cross_axis = main_axis.opposite();
 
 		let mut total_main_min_length = 0.0f32;

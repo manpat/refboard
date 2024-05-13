@@ -36,6 +36,16 @@ impl<T> WidgetParameter<T> {
 	{
 		self.value
 	}
+
+	pub fn get_or(&self, default: T) -> T
+		where T: Copy
+	{
+		if self.set {
+			self.value
+		} else {
+			default
+		}
+	}
 }
 
 
@@ -53,6 +63,14 @@ impl Axis {
 			Axis::Vertical => Axis::Horizontal,
 		}
 	}
+}
+
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum Align {
+	Start,
+	Middle,
+	End,
 }
 
 
@@ -198,16 +216,16 @@ pub struct LayoutConstraints {
 	pub horizontal_size_policy: WidgetParameter<SizingBehaviour>,
 	pub vertical_size_policy: WidgetParameter<SizingBehaviour>,
 
-	pub children_layout_axis: WidgetParameter<Axis>,
+	/// Which axis should be considered the 'main' axis when laying out children.
+	pub layout_axis: WidgetParameter<Axis>,
+
+	/// Default alignment of child elements in this layout's cross axis.
+	pub item_alignment: WidgetParameter<Align>,
+
+	/// Alignment of current element in the cross axis of the parent layout.
+	pub self_alignment: WidgetParameter<Align>,
 
 	// TODO(pat.m): baselines??
-
-	// size policies
-	// alignment
-
-	// children layout policy
-
-	// pub set: SetConstraints,
 }
 
 impl Default for LayoutConstraints {
@@ -228,7 +246,10 @@ impl Default for LayoutConstraints {
 			horizontal_size_policy: WidgetParameter::new(SizingBehaviour::FLEXIBLE),
 			vertical_size_policy: WidgetParameter::new(SizingBehaviour::FLEXIBLE),
 
-			children_layout_axis: WidgetParameter::new(Axis::Horizontal),
+			layout_axis: WidgetParameter::new(Axis::Horizontal),
+
+			item_alignment: WidgetParameter::new(Align::Start),
+			self_alignment: WidgetParameter::new(Align::Start),
 		}
 	}
 }
@@ -339,6 +360,7 @@ impl LayoutConstraints {
 pub fn layout_children_linear(
 	available_bounds: Aabb2,
 	main_axis: Axis,
+	item_alignment: Align,
 	widgets: &[WidgetId],
 	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
 	layouts: &mut SecondaryMap<WidgetId, Layout>)
@@ -358,7 +380,9 @@ pub fn layout_children_linear(
 	size_layouts_overlapping(available_bounds, cross_axis, widgets, constraints, layouts);
 
 	position_layouts_linear(available_bounds, main_axis, widgets, constraints, layouts);
-	// TODO(pat.m): position_layouts_overlapping - for alignment
+	position_layouts_overlapping(available_bounds, cross_axis, item_alignment, widgets, constraints, layouts);
+
+	calculate_bounds(widgets, constraints, layouts);
 }
 
 fn size_layouts_linear(available_bounds: Aabb2,
@@ -448,26 +472,84 @@ fn size_layouts_overlapping(available_bounds: Aabb2,
 
 
 fn position_layouts_linear(available_bounds: Aabb2,
-	main_axis: Axis,
+	axis: Axis,
 	widgets: &[WidgetId],
 	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
 	layouts: &mut SecondaryMap<WidgetId, Layout>)
 {
-	let mut cursor = available_bounds.min;
+	let mut cursor = match axis {
+		Axis::Horizontal => available_bounds.min.x,
+		Axis::Vertical => available_bounds.min.y,
+	};
 
 	for &widget_id in widgets {
 		let constraints = &constraints[widget_id];
 		let layout = &mut layouts[widget_id];
 
-		let min_pos = cursor + Vec2::new(constraints.margin.left.get(), constraints.margin.top.get());
-		let max_pos = min_pos + layout.size;
+		let (leading_margin, trailing_margin, length) = match axis {
+			Axis::Horizontal => (constraints.margin.left.get(), constraints.margin.right.get(), layout.size.x),
+			Axis::Vertical => (constraints.margin.top.get(), constraints.margin.bottom.get(), layout.size.y),
+		};
 
-		match main_axis {
-			Axis::Horizontal => cursor.x = max_pos.x + constraints.margin.right.get(),
-			Axis::Vertical => cursor.y = max_pos.y + constraints.margin.bottom.get(),
+		cursor += leading_margin;
+
+		match axis {
+			Axis::Horizontal => layout.position.x = cursor,
+			Axis::Vertical => layout.position.y = cursor,
 		}
 
-		let box_bounds = Aabb2::new(min_pos, max_pos);
+		cursor += length + trailing_margin;
+	}
+}
+
+
+fn position_layouts_overlapping(available_bounds: Aabb2,
+	axis: Axis,
+	item_alignment: Align,
+	widgets: &[WidgetId],
+	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
+	layouts: &mut SecondaryMap<WidgetId, Layout>)
+{
+	let (start, end) = match axis {
+		Axis::Horizontal => (available_bounds.min.x, available_bounds.max.x),
+		Axis::Vertical => (available_bounds.min.y, available_bounds.max.y),
+	};
+
+	for &widget_id in widgets {
+		let constraints = &constraints[widget_id];
+		let layout = &mut layouts[widget_id];
+
+		let alignment = constraints.self_alignment.get_or(item_alignment);
+
+		let (leading_margin, trailing_margin, length) = match axis {
+			Axis::Horizontal => (constraints.margin.left.get(), constraints.margin.right.get(), layout.size.x),
+			Axis::Vertical => (constraints.margin.top.get(), constraints.margin.bottom.get(), layout.size.y),
+		};
+
+		let position = match alignment {
+			Align::Start => start + leading_margin,
+			Align::Middle => start + ((end - start) / 2.0 - length / 2.0).max(0.0),
+			Align::End => end - trailing_margin - length,
+		};
+
+		match axis {
+			Axis::Horizontal => layout.position.x = position,
+			Axis::Vertical => layout.position.y = position,
+		}
+	}
+}
+
+
+fn calculate_bounds(
+	widgets: &[WidgetId],
+	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
+	layouts: &mut SecondaryMap<WidgetId, Layout>)
+{
+	for &widget_id in widgets {
+		let constraints = &constraints[widget_id];
+		let layout = &mut layouts[widget_id];
+
+		let box_bounds = Aabb2::new(layout.position, layout.position + layout.size);
 		let content_bounds = inset_lengths(&box_bounds, &constraints.padding);
 		let margin_bounds = outset_lengths(&box_bounds, &constraints.margin);
 
@@ -476,6 +558,7 @@ fn position_layouts_linear(available_bounds: Aabb2,
 		layout.margin_bounds = margin_bounds;
 	}
 }
+
 
 
 
@@ -504,6 +587,7 @@ pub fn outset_lengths(bounds: &Aabb2, lengths: &BoxLengths) -> Aabb2 {
 
 #[derive(Debug, Clone)]
 pub struct Layout {
+	pub position: Vec2,
 	pub size: Vec2,
 	pub final_size: bool,
 
@@ -515,6 +599,7 @@ pub struct Layout {
 impl Default for Layout {
 	fn default() -> Self {
 		Layout {
+			position: Vec2::zero(),
 			size: Vec2::zero(),
 			final_size: false,
 
