@@ -453,19 +453,18 @@ fn position_layouts_linear(available_bounds: Aabb2,
 	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
 	layouts: &mut SecondaryMap<WidgetId, Layout>)
 {
-	let mut cursor = available_bounds.min_max_corner();
+	let mut cursor = available_bounds.min;
 
 	for &widget_id in widgets {
 		let constraints = &constraints[widget_id];
 		let layout = &mut layouts[widget_id];
 
-		let margin_box_tl = cursor + Vec2::new(constraints.margin.left.get(), -constraints.margin.top.get());
-		let min_pos = margin_box_tl - Vec2::from_y(layout.size.y);
-		let max_pos = margin_box_tl + Vec2::from_x(layout.size.x);
+		let min_pos = cursor + Vec2::new(constraints.margin.left.get(), constraints.margin.top.get());
+		let max_pos = min_pos + layout.size;
 
 		match main_axis {
 			Axis::Horizontal => cursor.x = max_pos.x + constraints.margin.right.get(),
-			Axis::Vertical => cursor.y = min_pos.y - constraints.margin.bottom.get(),
+			Axis::Vertical => cursor.y = max_pos.y + constraints.margin.bottom.get(),
 		}
 
 		let box_bounds = Aabb2::new(min_pos, max_pos);

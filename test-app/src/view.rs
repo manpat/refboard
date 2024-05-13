@@ -239,7 +239,7 @@ impl Viewport {
 	pub fn new() -> Viewport {
 		Viewport {
 			size: Vec2::zero(),
-			centre: Vec2::new(100.0, -50.0),
+			centre: Vec2::zero(),
 			zoom: 1.0,
 		}
 	}
@@ -254,16 +254,14 @@ impl Viewport {
 	}
 
 	pub fn view_to_clip(&self) -> Mat2x3 {
-		// ?????
-		Mat2x3::scale_translate(Vec2::splat(2.0) / self.size, -Vec2::splat(0.0) / self.size)
+		Mat2x3::scale_translate(Vec2::new(2.0, -2.0) / self.size, Vec2::new(-1.0, 1.0))
 	}
 
 	pub fn physical_to_view(&self) -> Mat2x3 {
-		let flip = Vec2::new(1.0, -1.0);
-		Mat2x3::scale_translate(flip, -flip * self.size / 2.0)
+		Mat2x3::identity()
 	}
 
 	pub fn view_bounds(&self) -> Aabb2 {
-		Aabb2::around_point(Vec2::zero(), self.size / 2.0)
+		Aabb2::new(Vec2::zero(), self.size)
 	}
 }

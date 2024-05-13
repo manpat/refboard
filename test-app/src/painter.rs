@@ -41,7 +41,7 @@ impl Painter {
 
 	fn geo_builder<'g>(geo: &'g mut VertexBuffers<renderer::Vertex, u32>, color: impl Into<Color>) -> (impl StrokeGeometryBuilder + FillGeometryBuilder + 'g) {
 		let color = color.into().to_array();
-		BuffersBuilder::new(geo, VertexConstructor { color }).with_inverted_winding()
+		BuffersBuilder::new(geo, VertexConstructor { color })
 	}
 }
 
