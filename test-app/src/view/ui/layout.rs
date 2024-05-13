@@ -40,6 +40,23 @@ impl<T> WidgetParameter<T> {
 
 
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum Axis {
+	Horizontal,
+	Vertical,
+}
+
+impl Axis {
+	pub fn opposite(&self) -> Self {
+		match self {
+			Axis::Horizontal => Axis::Vertical,
+			Axis::Vertical => Axis::Horizontal,
+		}
+	}
+}
+
+
+
 #[derive(Default, Debug, Copy, Clone)]
 pub struct BoxLengths {
 	pub left: WidgetParameter<f32>,
@@ -86,6 +103,13 @@ impl BoxLengths {
 		self.bottom.set_default(bottom.get());
 	}
 
+	pub fn set_axis(&mut self, axis: Axis, value: f32)  {
+		match axis {
+			Axis::Horizontal => self.set_horizontal(value),
+			Axis::Vertical => self.set_vertical(value),
+		}
+	}
+
 	pub fn set_horizontal(&mut self, value: f32) {
 		self.left.set(value);
 		self.right.set(value);
@@ -107,6 +131,13 @@ impl BoxLengths {
 
 	pub fn vertical_sum(&self) -> f32 {
 		self.top.get() + self.bottom.get()
+	}
+
+	pub fn axis_sum(&self, axis: Axis) -> f32 {
+		match axis {
+			Axis::Horizontal => self.horizontal_sum(),
+			Axis::Vertical => self.vertical_sum(),
+		}
 	}
 }
 
@@ -157,7 +188,7 @@ pub struct LayoutConstraints {
 	pub max_width: WidgetParameter<f32>,
 	pub max_height: WidgetParameter<f32>,
 
-	// TODO(pat.m): should this include or exclude padding?
+	// Includes padding
 	pub preferred_width: WidgetParameter<f32>,
 	pub preferred_height: WidgetParameter<f32>,
 
@@ -166,6 +197,8 @@ pub struct LayoutConstraints {
 
 	pub horizontal_size_policy: WidgetParameter<SizingBehaviour>,
 	pub vertical_size_policy: WidgetParameter<SizingBehaviour>,
+
+	pub children_layout_axis: WidgetParameter<Axis>,
 
 	// TODO(pat.m): baselines??
 
@@ -194,6 +227,8 @@ impl Default for LayoutConstraints {
 
 			horizontal_size_policy: WidgetParameter::new(SizingBehaviour::FLEXIBLE),
 			vertical_size_policy: WidgetParameter::new(SizingBehaviour::FLEXIBLE),
+
+			children_layout_axis: WidgetParameter::new(Axis::Horizontal),
 		}
 	}
 }
@@ -217,48 +252,83 @@ impl LayoutConstraints {
 
 
 impl LayoutConstraints {
-	pub fn min_width(&self) -> f32 {
-		if self.horizontal_size_policy.get().contains(SizingBehaviour::CAN_SHRINK) {
-			self.min_width.get().max(self.padding.horizontal_sum())
-		} else {
-			self.preferred_width()
+	pub fn min_length_mut(&mut self, axis: Axis) -> &mut WidgetParameter<f32> {
+		match axis {
+			Axis::Horizontal => &mut self.min_width,
+			Axis::Vertical => &mut self.min_height,
 		}
 	}
 
-	pub fn max_width(&self) -> f32 {
-		if self.horizontal_size_policy.get().contains(SizingBehaviour::CAN_GROW) {
-			self.max_width.get().max(self.padding.horizontal_sum())
-		} else {
-			self.preferred_width()
+	pub fn preferred_length_mut(&mut self, axis: Axis) -> &mut WidgetParameter<f32> {
+		match axis {
+			Axis::Horizontal => &mut self.preferred_width,
+			Axis::Vertical => &mut self.preferred_height,
 		}
 	}
 
-	pub fn min_height(&self) -> f32 {
-		if self.vertical_size_policy.get().contains(SizingBehaviour::CAN_SHRINK) {
-			self.min_height.get().max(self.padding.vertical_sum())
-		} else {
-			self.preferred_height()
+	pub fn max_length_mut(&mut self, axis: Axis) -> &mut WidgetParameter<f32> {
+		match axis {
+			Axis::Horizontal => &mut self.max_width,
+			Axis::Vertical => &mut self.max_height,
 		}
 	}
 
-	pub fn max_height(&self) -> f32 {
-		if self.vertical_size_policy.get().contains(SizingBehaviour::CAN_GROW) {
-			self.max_height.get().max(self.padding.vertical_sum())
-		} else {
-			self.preferred_height()
+	pub fn size_policy_mut(&mut self, axis: Axis) -> &mut WidgetParameter<SizingBehaviour> {
+		match axis {
+			Axis::Horizontal => &mut self.horizontal_size_policy,
+			Axis::Vertical => &mut self.vertical_size_policy,
 		}
 	}
 
-	pub fn preferred_width(&self) -> f32 {
-		self.preferred_width.get()
-			.clamp(self.min_width.get(), self.max_width.get())
-			.max(self.padding.horizontal_sum())
+
+	pub fn min_length_unconstrained(&self, axis: Axis) -> f32 {
+		match axis {
+			Axis::Horizontal => self.min_width.get(),
+			Axis::Vertical => self.min_height.get(),
+		}
 	}
 
-	pub fn preferred_height(&self) -> f32 {
-		self.preferred_height.get()
-			.clamp(self.min_height.get(), self.max_height.get())
-			.max(self.padding.vertical_sum())
+	pub fn preferred_length_unconstrained(&self, axis: Axis) -> f32 {
+		match axis {
+			Axis::Horizontal => self.preferred_width.get(),
+			Axis::Vertical => self.preferred_height.get(),
+		}
+	}
+
+	pub fn max_length_unconstrained(&self, axis: Axis) -> f32 {
+		match axis {
+			Axis::Horizontal => self.max_width.get(),
+			Axis::Vertical => self.max_height.get(),
+		}
+	}
+
+	pub fn size_policy(&self, axis: Axis) -> SizingBehaviour {
+		match axis {
+			Axis::Horizontal => self.horizontal_size_policy.get(),
+			Axis::Vertical => self.vertical_size_policy.get(),
+		}
+	}
+
+	pub fn min_length(&self, axis: Axis) -> f32 {
+		if self.size_policy(axis).contains(SizingBehaviour::CAN_SHRINK) {
+			self.min_length_unconstrained(axis).max(self.padding.axis_sum(axis))
+		} else {
+			self.preferred_length(axis)
+		}
+	}
+
+	pub fn max_length(&self, axis: Axis) -> f32 {
+		if self.size_policy(axis).contains(SizingBehaviour::CAN_GROW) {
+			self.max_length_unconstrained(axis).max(self.padding.axis_sum(axis))
+		} else {
+			self.preferred_length(axis)
+		}
+	}
+
+	pub fn preferred_length(&self, axis: Axis) -> f32 {
+		self.preferred_length_unconstrained(axis)
+			.clamp(self.min_length_unconstrained(axis), self.max_length_unconstrained(axis))
+			.max(self.padding.axis_sum(axis))
 	}
 }
 
@@ -266,8 +336,9 @@ impl LayoutConstraints {
 
 
 
-pub fn layout_children(
+pub fn layout_children_linear(
 	available_bounds: Aabb2,
+	main_axis: Axis,
 	widgets: &[WidgetId],
 	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
 	layouts: &mut SecondaryMap<WidgetId, Layout>)
@@ -281,26 +352,36 @@ pub fn layout_children(
 		layouts.insert(widget_id, Layout::default());
 	}
 
-	size_layouts(available_bounds, widgets, constraints, layouts);
-	position_layouts(available_bounds, widgets, constraints, layouts);
+	let cross_axis = main_axis.opposite();
+
+	size_layouts_linear(available_bounds, main_axis, widgets, constraints, layouts);
+	size_layouts_overlapping(available_bounds, cross_axis, widgets, constraints, layouts);
+
+	position_layouts_linear(available_bounds, main_axis, widgets, constraints, layouts);
+	// TODO(pat.m): position_layouts_overlapping - for alignment
 }
 
-fn size_layouts(available_bounds: Aabb2,
+fn size_layouts_linear(available_bounds: Aabb2,
+	main_axis: Axis,
 	widgets: &[WidgetId],
 	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
 	layouts: &mut SecondaryMap<WidgetId, Layout>)
 {
-	let mut available_width = available_bounds.width();
+	let mut available_length = match main_axis {
+		Axis::Horizontal => available_bounds.width(),
+		Axis::Vertical => available_bounds.height(),
+	};
+
 	let mut remaining_widgets = widgets.len();
 
 	for &widget_id in widgets {
 		let constraints = &constraints[widget_id];
-		available_width -= constraints.margin.horizontal_sum();
-		available_width -= constraints.min_width();
+		available_length -= constraints.margin.axis_sum(main_axis);
+		available_length -= constraints.min_length(main_axis);
 	}
 
 	'next_pass: loop {
-		let allocated_extra_width = (available_width / remaining_widgets as f32).max(0.0);
+		let allocated_extra_length = (available_length / remaining_widgets as f32).max(0.0);
 
 		'current_pass: for &widget_id in widgets {
 			let layout = &mut layouts[widget_id];
@@ -310,21 +391,25 @@ fn size_layouts(available_bounds: Aabb2,
 
 			let constraints = &constraints[widget_id];
 
-			let min_width = constraints.min_width();
-			let max_width = constraints.max_width();
-			let extra_width = max_width - min_width;
-			let preferred_height = constraints.preferred_height();
+			let min_length = constraints.min_length(main_axis);
+			let max_length = constraints.max_length(main_axis);
+			let extra_length = max_length - min_length;
 
-			if allocated_extra_width >= extra_width {
-				layout.size = Vec2::new(min_width + extra_width, preferred_height);
+			let layout_length = match main_axis {
+				Axis::Horizontal => &mut layout.size.x,
+				Axis::Vertical => &mut layout.size.y,
+			};
+
+			if allocated_extra_length >= extra_length {
+				*layout_length = min_length + extra_length;
 				layout.final_size = true;
 				remaining_widgets -= 1;
-				available_width -= extra_width;
+				available_length -= extra_length;
 				continue 'next_pass;
 
 			} else {
-				let extra_width = allocated_extra_width.min(extra_width);
-				layout.size = Vec2::new(min_width + extra_width, preferred_height);
+				let extra_length = allocated_extra_length.min(extra_length);
+				*layout_length = min_length + extra_length;
 			}
 		}
 
@@ -332,9 +417,38 @@ fn size_layouts(available_bounds: Aabb2,
 	}
 }
 
+fn size_layouts_overlapping(available_bounds: Aabb2,
+	main_axis: Axis,
+	widgets: &[WidgetId],
+	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
+	layouts: &mut SecondaryMap<WidgetId, Layout>)
+{
+	let available_length = match main_axis {
+		Axis::Horizontal => available_bounds.width(),
+		Axis::Vertical => available_bounds.height(),
+	};
+
+	for &widget_id in widgets {
+		let layout = &mut layouts[widget_id];
+		let constraints = &constraints[widget_id];
+
+		let margin = constraints.margin.axis_sum(main_axis);
+
+		let min_length = constraints.min_length(main_axis);
+		let max_length = constraints.max_length(main_axis);
+
+		let layout_length = match main_axis {
+			Axis::Horizontal => &mut layout.size.x,
+			Axis::Vertical => &mut layout.size.y,
+		};
+
+		*layout_length = (available_length - margin).clamp(min_length, max_length);
+	}
+}
 
 
-fn position_layouts(available_bounds: Aabb2,
+fn position_layouts_linear(available_bounds: Aabb2,
+	main_axis: Axis,
 	widgets: &[WidgetId],
 	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
 	layouts: &mut SecondaryMap<WidgetId, Layout>)
@@ -345,13 +459,14 @@ fn position_layouts(available_bounds: Aabb2,
 		let constraints = &constraints[widget_id];
 		let layout = &mut layouts[widget_id];
 
-		let size = layout.size;
-
 		let margin_box_tl = cursor + Vec2::new(constraints.margin.left.get(), -constraints.margin.top.get());
-		let min_pos = margin_box_tl - Vec2::from_y(size.y);
-		let max_pos = margin_box_tl + Vec2::from_x(size.x);
+		let min_pos = margin_box_tl - Vec2::from_y(layout.size.y);
+		let max_pos = margin_box_tl + Vec2::from_x(layout.size.x);
 
-		cursor.x = max_pos.x + constraints.margin.right.get();
+		match main_axis {
+			Axis::Horizontal => cursor.x = max_pos.x + constraints.margin.right.get(),
+			Axis::Vertical => cursor.y = min_pos.y - constraints.margin.bottom.get(),
+		}
 
 		let box_bounds = Aabb2::new(min_pos, max_pos);
 		let content_bounds = inset_lengths(&box_bounds, &constraints.padding);

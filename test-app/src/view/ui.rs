@@ -49,7 +49,7 @@ impl Ui {
 		let mut hierarchy = Hierarchy::default();
 		let mut stack = Vec::new();
 
-		let root_widget = BoxLayout{};
+		let root_widget = BoxLayout{ axis: Axis::Horizontal };
 
 		let root_id = widgets.insert(Box::new(root_widget));
 		stack.push(root_id);
@@ -111,17 +111,17 @@ impl Ui {
 		self.widget_layouts.set_capacity(num_widgets);
 
 		for &widget_id in hierarchy.root_nodes.iter() {
-			layout_children(available_bounds, &[widget_id], &layout_constraints, &mut self.widget_layouts);
+			layout_children_linear(available_bounds, Axis::Horizontal, &[widget_id], &layout_constraints, &mut self.widget_layouts);
 		}
-
 
 		// top down resolve layouts and assign rects
 		hierarchy.visit_breadth_first(None, |widget_id, children| {
 			// this widget should already be laid out or root
 			let content_bounds = self.widget_layouts[widget_id].content_bounds;
+			let main_axis = layout_constraints[widget_id].children_layout_axis.get();
 
 			// TODO(pat.m): layout mode?
-			layout_children(content_bounds, children, &layout_constraints, &mut self.widget_layouts);
+			layout_children_linear(content_bounds, main_axis, children, &layout_constraints, &mut self.widget_layouts);
 		});
 	}
 
@@ -184,52 +184,60 @@ impl Widget for () {
 
 
 #[derive(Debug)]
-pub struct BoxLayout{}
+pub struct BoxLayout {
+	pub axis: Axis,
+}
 
 impl Widget for BoxLayout {
 	fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
 		let ConstraintContext { constraints, children, constraint_map } = ctx;
 
-		let mut total_min_width = 0.0f32;
-		let mut total_min_height = 0.0f32;
+		constraints.children_layout_axis.set_default(self.axis);
 
-		let mut total_preferred_width = 0.0f32;
-		let mut total_preferred_height = 0.0f32;
+		let main_axis = constraints.children_layout_axis.get();
+		let cross_axis = main_axis.opposite();
+
+		let mut total_main_min_length = 0.0f32;
+		let mut total_cross_min_length = 0.0f32;
+
+		let mut total_main_preferred_length = 0.0f32;
+		let mut total_cross_preferred_length = 0.0f32;
 
 		for &child in children {
 			let child_constraints = &constraint_map[child];
 
-			let margin_x = child_constraints.margin.horizontal_sum();
-			let margin_y = child_constraints.margin.vertical_sum();
+			let margin_main = child_constraints.margin.axis_sum(main_axis);
+			let margin_cross = child_constraints.margin.axis_sum(cross_axis);
 
-			let min_width = child_constraints.min_width();
-			let preferred_width = child_constraints.preferred_width();
+			let min_length = child_constraints.min_length(main_axis);
+			let preferred_length = child_constraints.preferred_length(main_axis);
 
-			total_min_width += min_width + margin_x;
-			total_preferred_width += preferred_width + margin_x;
+			total_main_min_length += min_length + margin_main;
+			total_main_preferred_length += preferred_length + margin_main;
 
-			total_min_height = total_min_height.max(child_constraints.min_height() + margin_y);
-			total_preferred_height = total_preferred_height.max(child_constraints.preferred_height() + margin_y);
+			total_cross_min_length = total_cross_min_length.max(child_constraints.min_length(cross_axis) + margin_cross);
+			total_cross_preferred_length = total_cross_preferred_length.max(child_constraints.preferred_length(cross_axis) + margin_cross);
 		}
 
 		constraints.padding.set_default(8.0);
 
-		let padding_x = constraints.padding.horizontal_sum();
-		let padding_y = constraints.padding.vertical_sum();
+		let padding_main = constraints.padding.axis_sum(main_axis);
+		let padding_cross = constraints.padding.axis_sum(cross_axis);
 
-		total_min_width += padding_x;
-		total_min_height += padding_y;
+		total_main_min_length += padding_main;
+		total_cross_min_length += padding_cross;
 
-		total_preferred_width += padding_x;
-		total_preferred_height += padding_y;
+		total_main_preferred_length += padding_main;
+		total_cross_preferred_length += padding_cross;
 
-		constraints.preferred_width.set_default(total_preferred_width);
-		constraints.preferred_height.set_default(total_preferred_height);
-		constraints.min_width.set_default(total_min_width);
-		constraints.min_height.set_default(total_min_height);
+		constraints.min_length_mut(main_axis).set_default(total_main_min_length);
+		constraints.min_length_mut(cross_axis).set_default(total_cross_min_length);
 
-		constraints.horizontal_size_policy.set_default(SizingBehaviour::FLEXIBLE);
-		// constraints.margin = BoxLengths::from(4.0);
+		constraints.preferred_length_mut(main_axis).set_default(total_main_preferred_length);
+		constraints.preferred_length_mut(cross_axis).set_default(total_cross_preferred_length);
+
+		constraints.size_policy_mut(main_axis).set_default(SizingBehaviour::FLEXIBLE);
+		constraints.size_policy_mut(cross_axis).set_default(SizingBehaviour::FLEXIBLE);
 	}
 
 	fn draw(&self, painter: &mut Painter, layout: &Layout) {
