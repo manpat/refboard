@@ -1,14 +1,15 @@
 use crate::prelude::*;
 
+pub mod widget;
 pub mod layout;
 pub mod hierarchy;
 
+pub use widget::*;
 pub use layout::*;
 pub use hierarchy::*;
 
 
-pub struct System {
-}
+pub struct System {}
 
 impl System {
 	pub fn new() -> System {
@@ -65,26 +66,6 @@ impl Ui {
 		}
 	}
 
-	pub fn parent_id(&self) -> WidgetId {
-		self.stack.borrow().last().copied()
-			.expect("Stack empty")
-	}
-
-	pub fn add_widget(&self, widget: impl Widget + 'static) -> WidgetId {
-		self.add_widget_to(widget, self.parent_id())
-	}
-
-	pub fn add_widget_to(&self, widget: impl Widget + 'static, parent_id: impl Into<Option<WidgetId>>) -> WidgetId {
-		let widget_id = self.widgets.borrow_mut().insert(Box::new(widget));
-		self.hierarchy.borrow_mut().add(widget_id, parent_id.into());
-		widget_id
-	}
-
-	pub fn mutate_widget_constraints(&self, widget_id: WidgetId, mutate: impl FnOnce(&mut LayoutConstraints)) {
-		let mut lcs = self.layout_constraints.borrow_mut();
-		mutate(lcs.entry(widget_id).unwrap().or_default());
-	}
-
 	pub fn layout(&mut self, available_bounds: Aabb2) {
 		let num_widgets = self.widgets.borrow().len();
 
@@ -138,23 +119,72 @@ impl Ui {
 
 
 impl Ui {
-	pub fn dummy(&self) {
-		self.add_widget(());
+	pub fn parent_id(&self) -> WidgetId {
+		self.stack.borrow().last().copied()
+			.expect("Stack empty")
+	}
+
+	pub fn add_widget(&self, widget: impl Widget + 'static) -> WidgetRef<'_> {
+		self.add_widget_to(widget, self.parent_id())
+	}
+
+	pub fn add_widget_to(&self, widget: impl Widget + 'static, parent_id: impl Into<Option<WidgetId>>) -> WidgetRef<'_> {
+		let widget_id = self.widgets.borrow_mut().insert(Box::new(widget));
+		self.hierarchy.borrow_mut().add(widget_id, parent_id.into());
+
+		WidgetRef {
+			widget_id,
+			constraints_map: &self.layout_constraints,
+		}
+	}
+
+	pub fn mutate_widget_constraints(&self, widget_id: impl Into<WidgetId>, mutate: impl FnOnce(&mut LayoutConstraints)) {
+		let mut lcs = self.layout_constraints.borrow_mut();
+		mutate(lcs.entry(widget_id.into()).unwrap().or_default());
+	}
+
+	pub fn push_layout(&self, widget_id: impl Into<WidgetId>) {
+		self.stack.borrow_mut().push(widget_id.into());
+	}
+
+	pub fn pop_layout(&self) {
+		self.stack.borrow_mut().pop().expect("Parent stack empty!");
+	}
+}
+
+
+impl Ui {
+	pub fn dummy(&self) -> WidgetRef<'_> {
+		self.add_widget(())
+	}
+
+	pub fn spring(&self, axis: Axis) -> WidgetRef<'_> {
+		#[derive(Debug)]
+		struct Spring(Axis);
+
+		// TODO(pat.m): can I derive Axis from context?
+
+		impl Widget for Spring {
+			fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
+				ctx.constraints.size_policy_mut(self.0).set(SizingBehaviour::FLEXIBLE);
+				ctx.constraints.size_policy_mut(self.0.opposite()).set(SizingBehaviour::FIXED);
+				ctx.constraints.self_alignment.set(Align::Middle);
+			}
+		}
+
+		self.add_widget(Spring(axis))
 	}
 }
 
 
 
+impl Widget for () {
+	fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
+		ctx.constraints.margin.set_default(16.0);
+		ctx.constraints.padding.set_default(16.0);
 
-pub struct ConstraintContext<'a> {
-	pub constraints: &'a mut LayoutConstraints,
-	pub children: &'a [WidgetId],
-	pub constraint_map: &'a LayoutConstraintMap,
-}
-
-
-pub trait Widget : std::fmt::Debug {
-	fn calculate_constraints(&self, _: ConstraintContext<'_>) {}
+		ctx.constraints.horizontal_size_policy.set_default(SizingBehaviour::FLEXIBLE);
+	}
 
 	fn draw(&self, painter: &mut Painter, layout: &Layout) {
 		let widget_color = [0.5; 3];
@@ -167,27 +197,20 @@ pub trait Widget : std::fmt::Debug {
 	}
 }
 
-impl Widget for () {
-	fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
-		ctx.constraints.margin.set_default(16.0);
-		ctx.constraints.padding.set_default(16.0);
-
-		// ctx.constraints.preferred_width.set_default(50.0);
-		// ctx.constraints.preferred_height.set_default(50.0);
-		// ctx.constraints.min_width.set_default(10.0);
-		// ctx.constraints.min_height.set_default(10.0);
-
-		// ctx.constraints.max_width.set_default(50.0);
-		// ctx.constraints.max_height.set_default(50.0);
-
-		ctx.constraints.horizontal_size_policy.set_default(SizingBehaviour::FLEXIBLE);
-	}
-}
-
 
 #[derive(Debug)]
 pub struct BoxLayout {
 	pub axis: Axis,
+}
+
+impl BoxLayout {
+	pub fn horizontal() -> Self {
+		BoxLayout { axis: Axis::Horizontal }
+	}
+
+	pub fn vertical() -> Self {
+		BoxLayout { axis: Axis::Vertical }
+	}
 }
 
 impl Widget for BoxLayout {

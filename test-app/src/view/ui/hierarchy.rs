@@ -28,6 +28,10 @@ impl Hierarchy {
 		assert!(prev_value.is_none(), "Widget already added to hierarchy!");
 	}
 
+	pub fn parent(&self, widget_id: WidgetId) -> Option<WidgetId> {
+		self.info[widget_id].parent
+	}
+
 	pub fn children(&self, widget_id: impl Into<Option<WidgetId>>) -> &[WidgetId] {
 		match widget_id.into() {
 			Some(widget_id) => self.info[widget_id].children.as_slice(),
