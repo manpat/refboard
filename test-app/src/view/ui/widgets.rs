@@ -7,8 +7,8 @@ use std::fmt::{self, Debug};
 
 impl Widget for () {
 	fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
-		ctx.constraints.margin.set_default(16.0);
-		ctx.constraints.padding.set_default(16.0);
+		ctx.constraints.margin.set_default(4.0);
+		ctx.constraints.padding.set_default(8.0);
 
 		ctx.constraints.horizontal_size_policy.set_default(SizingBehaviour::FLEXIBLE);
 	}
@@ -19,7 +19,6 @@ impl Widget for () {
 		painter.line(layout.box_bounds.min, layout.box_bounds.max, widget_color);
 		painter.line(layout.box_bounds.min_max_corner(), layout.box_bounds.max_min_corner(), widget_color);
 
-		painter.rounded_rect_outline(layout.margin_bounds, 8.0, [0.1, 0.5, 1.0, 0.5]);
 		painter.rounded_rect_outline(layout.content_bounds, 8.0, [0.5, 1.0, 0.5, 0.5]);
 	}
 }
@@ -111,19 +110,60 @@ impl Widget for BoxLayout {
 		constraints.preferred_length_mut(main_axis).set_default(total_main_preferred_length);
 		constraints.preferred_length_mut(cross_axis).set_default(total_cross_preferred_length);
 
-		constraints.size_policy_mut(main_axis).set_default(SizingBehaviour::FLEXIBLE);
-		constraints.size_policy_mut(cross_axis).set_default(SizingBehaviour::FLEXIBLE);
+		constraints.size_policy_mut(main_axis).set_default(SizingBehaviour::FIXED);
+		constraints.size_policy_mut(cross_axis).set_default(SizingBehaviour::FIXED);
+	}
+}
+
+
+
+#[derive(Debug)]
+pub struct FrameWidget<I: Widget> {
+	pub inner: I,
+
+	outline_color: Color,
+	background_color: Color,
+}
+
+impl<W: Widget> FrameWidget<W> {
+	pub fn new(inner: W) -> Self {
+		FrameWidget {
+			inner,
+			outline_color: Color::grey_a(1.0, 0.04),
+			background_color: Color::grey_a(1.0, 0.01),
+		}
+	}
+
+	pub fn with_color(mut self, color: impl Into<Color>) -> Self {
+		self.background_color = color.into();
+		self
+	}
+}
+
+impl FrameWidget<BoxLayout> {
+	pub fn horizontal() -> Self {
+		FrameWidget::new(BoxLayout::horizontal())
+	}
+
+	pub fn vertical() -> Self {
+		FrameWidget::new(BoxLayout::vertical())
+	}
+}
+
+impl<W> Widget for FrameWidget<W>
+	where W: Widget
+{
+	fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
+		self.inner.calculate_constraints(ctx);
 	}
 
 	fn draw(&self, painter: &mut Painter, layout: &Layout) {
-		let widget_color = Color::grey_a(1.0, 0.01);
-		painter.rounded_rect(layout.box_bounds, 8.0, widget_color);
-		painter.rounded_rect_outline(layout.box_bounds, 8.0, Color::grey_a(1.0, 0.04));
-		// painter.line(layout.box_bounds.min, layout.box_bounds.max, widget_color);
-		// painter.line(layout.box_bounds.min_max_corner(), layout.box_bounds.max_min_corner(), widget_color);
+		let rounding = 4.0;
 
-		painter.rounded_rect_outline(layout.content_bounds, 8.0, [0.1, 0.4, 0.1]);
-		painter.rounded_rect_outline(layout.margin_bounds, 8.0, [0.1, 0.1, 0.4]);
+		painter.rounded_rect(layout.box_bounds, rounding, self.background_color);
+		painter.rounded_rect_outline(layout.box_bounds, rounding, self.outline_color);
+
+		self.inner.draw(painter, layout);
 	}
 }
 

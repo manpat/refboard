@@ -73,104 +73,32 @@ impl View {
 
 		// painter.rect(menu_bounds, [0.02; 3]);
 
+		let button_rect = Aabb2::new(Vec2::new(0.0, 0.0), Vec2::new(100.0, 100.0));
+
+
 		self.ui.run(view_bounds, painter, |ui| {
-			use ui::SizingBehaviour;
 
-			ui.dummy().set_constraints(|lc| {
-				lc.preferred_width.set(100.0);
-				// lc.min_width.set(20.0);
-				lc.max_width.set(250.0);
-				lc.set_height(100.0);
-				lc.horizontal_size_policy.set(SizingBehaviour::CAN_GROW);
+			let color = if let Some(cursor_pos) = self.input.cursor_pos_view
+				&& button_rect.contains_point(cursor_pos)
+			{
+				[0.07; 3]
+			} else {
+				[0.03; 3]
+			};
 
-				lc.self_alignment.set(ui::Align::Middle);
-			});
+			let frame = ui.add_widget(ui::FrameWidget::horizontal().with_color(color));
 
-			let inner_layout = ui.add_widget(ui::BoxLayout::vertical())
-				.set_constraints(|lc| {
-					lc.horizontal_size_policy.set(SizingBehaviour::CAN_SHRINK);
-					lc.vertical_size_policy.set(SizingBehaviour::FIXED);
-					lc.max_width.set(300.0);
-					lc.content_alignment.set(ui::Align::Middle);
-					lc.self_alignment.set(ui::Align::Middle);
-				});
+			frame.widget(|w: &mut ui::FrameWidget<ui::BoxLayout>| w.inner.axis = ui::Axis::Vertical);
 
-			ui.push_layout(inner_layout);
-
-			ui.dummy().set_constraints(|lc| {
-				lc.preferred_width.set(100.0);
-				lc.min_width.set(40.0);
-				// lc.max_width.set(250.0);
-				lc.set_height(120.0);
-				lc.horizontal_size_policy.set(SizingBehaviour::CAN_SHRINK);
-			});
-
-			ui.add_widget(ui::DrawFnWidget(|painter, layout| {
-				let bounds = layout.content_bounds;
-				let radius = bounds.width().min(bounds.height())/2.0;
-
-				painter.rect_outline(bounds, Color::green().with_alpha(0.1));
-				painter.circle(bounds.center(), radius, Color::cyan());
-			}))
-			.set_constraints(|lc| {
-				lc.min_width.set(40.0);
-				lc.min_height.set(40.0);
-				lc.preferred_width.set(100.0);
-				lc.preferred_height.set(100.0);
-				// lc.preferred_width.set(10.0);
-				lc.horizontal_size_policy.set(SizingBehaviour::CAN_SHRINK);
-				lc.vertical_size_policy.set(SizingBehaviour::CAN_SHRINK);
-			});
-
+			ui.push_layout(frame);
+			ui.dummy().set_constraints(|c| c.set_size((20.0, 20.0)));
+			ui.dummy().set_constraints(|c| c.set_size((50.0, 50.0)));
+			ui.dummy().set_constraints(|c| c.set_size((100.0, 50.0)));
+			ui.dummy().set_constraints(|c| c.set_size((50.0, 100.0)));
 			ui.pop_layout();
-
-			ui.dummy().set_constraints(|lc| {
-				lc.set_width(100.0);
-				lc.set_height(120.0);
-				lc.horizontal_size_policy.set(SizingBehaviour::FIXED);
-				lc.self_alignment.set(ui::Align::End);
-			});
-
-			let inner_layout = ui.add_widget(ui::BoxLayout::vertical())
-				.set_constraints(|lc| {
-					// lc.min_width.set(50.0);
-					// lc.min_height.set(50.0);
-					// lc.preferred_width.set(100.0);
-					// lc.preferred_height.set(100.0);
-					lc.horizontal_size_policy.set(SizingBehaviour::CAN_GROW);
-					lc.padding.set_vertical(20.0);
-					lc.padding.set_horizontal(20.0);
-				});
-
-			ui.push_layout(inner_layout);
-
-			ui.dummy();
-			ui.spring(ui::Axis::Vertical);
-			ui.dummy();
-			
-			let inner_inner_layout = ui.add_widget(ui::BoxLayout::horizontal())
-				.set_constraints(|lc| {
-					lc.horizontal_size_policy.set(SizingBehaviour::FIXED);
-				});
-
-			ui.add_widget_to((), inner_inner_layout);
-
-			ui.pop_layout();
-
-
-			ui.dummy();
-
-			ui.spring(ui::Axis::Horizontal);
-
-			ui.dummy().set_constraints(|lc| {
-				lc.min_width.set(25.0);
-				lc.max_width.set(1000.0);
-				lc.horizontal_size_policy.set(SizingBehaviour::FLEXIBLE);
-				lc.vertical_size_policy.set(SizingBehaviour::FIXED);
-				lc.preferred_width.set(200.0);
-				lc.preferred_height.set(100.0);
-			});
 		});
+
+		painter.rect_outline(button_rect, [0.0, 0.0, 1.0]);
 
 
 		// Cursor

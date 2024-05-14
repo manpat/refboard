@@ -18,6 +18,7 @@ impl System {
 		System{}
 	}
 
+	// TODO(pat.m): could this be built around the same mechanism as std::thread::scope?
 	pub fn run(&mut self, bounds: Aabb2, painter: &mut Painter, build_ui: impl FnOnce(&Ui)) {
 		let mut ui = Ui::new();
 		build_ui(&ui);
@@ -134,10 +135,9 @@ impl Ui {
 		let widget_id = self.widgets.borrow_mut().insert(Box::new(widget));
 		self.hierarchy.borrow_mut().add(widget_id, parent_id.into());
 
-		WidgetRef {
-			widget_id,
-			constraints_map: &self.layout_constraints,
-		}
+		// TODO(pat.m): calc some kind of key that can be used across frames for input purposes
+
+		WidgetRef { widget_id, ui: self }
 	}
 
 	pub fn mutate_widget_constraints(&self, widget_id: impl Into<WidgetId>, mutate: impl FnOnce(&mut LayoutConstraints)) {

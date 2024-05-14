@@ -1,7 +1,7 @@
 use crate::prelude::*;
-use super::{WidgetId, Layout, LayoutConstraints, LayoutConstraintMap};
+use super::{WidgetId, Ui, Layout, LayoutConstraints, LayoutConstraintMap};
 
-use std::any::Any;
+use std::any::{Any, TypeId};
 use std::fmt::Debug;
 
 
@@ -12,25 +12,22 @@ pub struct ConstraintContext<'a> {
 }
 
 
-pub trait Widget : Any + Debug {
-	fn as_any(&self) -> &dyn Any
-		where Self: Sized
-	{
-		self as &dyn Any
-	}
+pub trait AsAny : Any {
+	fn as_any(&self) -> &dyn Any;
+	fn as_any_mut(&mut self) -> &mut dyn Any;
+}
 
-	fn as_any_mut(&mut self) -> &mut dyn Any
-		where Self: Sized
-	{
-		self as &mut dyn Any
-	}
+impl<T> AsAny for T
+	where T: Any
+{
+	fn as_any(&self) -> &dyn Any { self }
+	fn as_any_mut(&mut self) -> &mut dyn Any { self }
+}
 
+pub trait Widget : AsAny + Debug {
 	fn calculate_constraints(&self, _: ConstraintContext<'_>) {}
 
-	fn draw(&self, painter: &mut Painter, layout: &Layout) {
-		let widget_color = Color::grey_a(0.5, 0.1);
-		painter.rounded_rect_outline(layout.box_bounds, 8.0, widget_color);
-	}
+	fn draw(&self, _painter: &mut Painter, _layout: &Layout) {}
 }
 
 
@@ -38,14 +35,25 @@ pub trait Widget : Any + Debug {
 #[derive(Debug, Copy, Clone)]
 pub struct WidgetRef<'ui> {
 	pub widget_id: WidgetId,
-	pub constraints_map: &'ui RefCell<LayoutConstraintMap>,
+	pub ui: &'ui Ui,
 }
 
 impl<'ui> WidgetRef<'ui> {
 	pub fn set_constraints(self, mutate: impl FnOnce(&mut LayoutConstraints)) -> Self {
-		let mut lcs = self.constraints_map.borrow_mut();
+		let mut lcs = self.ui.layout_constraints.borrow_mut();
 		mutate(lcs.entry(self.widget_id).unwrap().or_default());
 		self
+	}
+
+	// TODO(pat.m): W could be provided here
+	pub fn widget<W, R>(&self, mutate: impl FnOnce(&mut W) -> R) -> Option<R>
+		where W: Widget
+	{
+		let mut widgets = self.ui.widgets.borrow_mut();
+		let mut widget = &mut *widgets[self.widget_id];
+
+		widget.as_any_mut().downcast_mut::<W>()
+			.map(mutate)
 	}
 }
 

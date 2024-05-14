@@ -266,7 +266,8 @@ impl LayoutConstraints {
 		self.max_height.set(height);
 	}
 
-	pub fn set_size(&mut self, size: Vec2) {
+	pub fn set_size(&mut self, size: impl Into<Vec2>) {
+		let size = size.into();
 		self.set_width(size.x);
 		self.set_height(size.y);
 	}
