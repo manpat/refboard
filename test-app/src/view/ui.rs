@@ -19,17 +19,20 @@ use std::cell::Cell;
 
 
 pub struct System {
-
+	hovered_widget: Option<WidgetId>,
 }
 
 impl System {
 	pub fn new() -> System {
-		System{}
+		System {
+			hovered_widget: None,
+		}
 	}
 
 	// TODO(pat.m): could this be built around the same mechanism as std::thread::scope?
 	pub fn run(&mut self, bounds: Aabb2, painter: &mut Painter, input: &Input, build_ui: impl FnOnce(&Ui)) {
 		let mut ui = Ui::new();
+		ui.hovered_widget = self.hovered_widget;
 
 		// TODO(pat.m): handle input first, using cached input handlers from previous frame
 
@@ -38,15 +41,19 @@ impl System {
 		ui.layout(bounds);
 		ui.handle_input(input);
 		ui.draw(painter);
+
+		self.hovered_widget = ui.hovered_widget;
 	}
 }
 
 
-slotmap::new_key_type! {
-	pub struct WidgetId;
-}
 
-type WidgetContainer = SlotMap<WidgetId, Box<dyn Widget>>;
+type WidgetContainer = HashMap<WidgetId, Box<dyn Widget>>;
+
+
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+pub struct WidgetId(u64);
+
 
 
 #[derive(Debug)]
@@ -57,7 +64,7 @@ pub struct Ui {
 	stack: RefCell<Vec<WidgetId>>,
 	layout_constraints: RefCell<LayoutConstraintMap>,
 
-	widget_layouts: SecondaryMap<WidgetId, Layout>,
+	widget_layouts: LayoutMap,
 
 	hovered_widget: Option<WidgetId>,
 }
@@ -70,7 +77,8 @@ impl Ui {
 
 		let root_widget = BoxLayout{ axis: Axis::Horizontal };
 
-		let root_id = widgets.insert(Box::new(root_widget));
+		let root_id = WidgetId(0);
+		widgets.insert(root_id, Box::new(root_widget));
 		stack.push(root_id);
 		hierarchy.add(root_id, None);
 
@@ -80,7 +88,7 @@ impl Ui {
 			stack: stack.into(),
 			layout_constraints: LayoutConstraintMap::default().into(),
 
-			widget_layouts: SecondaryMap::new(),
+			widget_layouts: LayoutMap::new(),
 
 			hovered_widget: None,
 		}
@@ -92,14 +100,14 @@ impl Ui {
 		let hierarchy = self.hierarchy.borrow();
 
 		let mut layout_constraints = self.layout_constraints.borrow_mut();
-		layout_constraints.set_capacity(num_widgets);
+		layout_constraints.reserve(num_widgets);
 
 		// bottom up request size hints/policies and content sizes if appropriate
 		hierarchy.visit_leaves_first(None, |widget_id| {
-			let mut constraints = layout_constraints.get(widget_id).cloned().unwrap_or_default();
+			let mut constraints = layout_constraints.get(&widget_id).cloned().unwrap_or_default();
 			let children = hierarchy.children(widget_id);
 
-			self.widgets.borrow_mut()[widget_id].constrain(ConstraintContext {
+			self.widgets.borrow_mut().get_mut(&widget_id).unwrap().constrain(ConstraintContext {
 				constraints: &mut constraints,
 				children,
 				constraint_map: &mut layout_constraints,
@@ -109,7 +117,7 @@ impl Ui {
 		});
 
 		self.widget_layouts.clear();
-		self.widget_layouts.set_capacity(num_widgets);
+		self.widget_layouts.reserve(num_widgets);
 
 		for &widget_id in hierarchy.root_nodes.iter() {
 			layout_children_linear(available_bounds, Axis::Horizontal, Align::Start, &[widget_id], &layout_constraints, &mut self.widget_layouts);
@@ -118,8 +126,8 @@ impl Ui {
 		// top down resolve layouts and assign rects
 		hierarchy.visit_breadth_first(None, |widget_id, children| {
 			// this widget should already be laid out or root
-			let content_bounds = self.widget_layouts[widget_id].content_bounds;
-			let constraints = &layout_constraints[widget_id];
+			let content_bounds = self.widget_layouts[&widget_id].content_bounds;
+			let constraints = &layout_constraints[&widget_id];
 			let main_axis = constraints.layout_axis.get();
 			let content_alignment = constraints.content_alignment.get();
 
@@ -134,7 +142,7 @@ impl Ui {
 		if let Some(cursor_pos) = input.cursor_pos_view {
 			self.hierarchy.borrow()
 				.visit_breadth_first(None, |widget_id, _| {
-					let box_bounds = self.widget_layouts[widget_id].box_bounds;
+					let box_bounds = self.widget_layouts[&widget_id].box_bounds;
 					if box_bounds.contains_point(cursor_pos) {
 						self.hovered_widget = Some(widget_id);
 					}
@@ -146,12 +154,12 @@ impl Ui {
 		// draw from root to leaves
 		self.hierarchy.borrow()
 			.visit_breadth_first(None, |widget_id, _| {
-				let layout = &self.widget_layouts[widget_id];
-				self.widgets.borrow_mut()[widget_id].draw(painter, layout);
+				let layout = &self.widget_layouts[&widget_id];
+				self.widgets.borrow_mut().get_mut(&widget_id).unwrap().draw(painter, layout);
 
-				if self.hovered_widget == Some(widget_id) {
-					painter.rect_outline(layout.box_bounds, Color::light_blue());
-				}
+				// if self.hovered_widget == Some(widget_id) {
+				// 	painter.rect_outline(layout.box_bounds, Color::light_blue());
+				// }
 			});
 	}
 }
@@ -182,19 +190,17 @@ impl Ui {
 		parent_id.hash(&mut hasher);
 		type_id.hash(&mut hasher);
 		hasher.write_usize(widget_number);
-		let persistent_id = PersistentWidgetId(hasher.finish());
+		let widget_id = WidgetId(hasher.finish());
 
-		// println!("Widget hash {widget:?} -> {}", hasher.finish());
-
-		let widget_id = self.widgets.borrow_mut().insert(Box::new(widget));
+		self.widgets.borrow_mut().insert(widget_id, Box::new(widget));
 		hierarchy.add(widget_id, parent_id);
 
-		WidgetRef { widget_id, persistent_id, ui: self, phantom: PhantomData }
+		WidgetRef { widget_id, ui: self, phantom: PhantomData }
 	}
 
 	pub fn mutate_widget_constraints(&self, widget_id: impl Into<WidgetId>, mutate: impl FnOnce(&mut LayoutConstraints)) {
 		let mut lcs = self.layout_constraints.borrow_mut();
-		mutate(lcs.entry(widget_id.into()).unwrap().or_default());
+		mutate(lcs.entry(widget_id.into()).or_default());
 	}
 
 	pub fn push_layout(&self, widget_id: impl Into<WidgetId>) {
@@ -218,7 +224,3 @@ impl Ui {
 	}
 }
 
-
-
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
-pub struct PersistentWidgetId(u64);

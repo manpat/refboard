@@ -48,39 +48,35 @@ impl View {
 	pub fn paint(&mut self, painter: &mut Painter, _app: &app::App) {
 		let view_bounds = self.viewport.view_bounds();
 
-		// let button_rect = Aabb2::around_point(Vec2::new(0.0, 100.0), Vec2::splat(30.0)).translate(Vec2::splat(0.5));
-
-		// // Viewspace Button
-		// if let Some(cursor_pos) = self.input.cursor_pos_view
-		// 	&& button_rect.contains_point(cursor_pos)
-		// {
-		// 	painter.rounded_rect(button_rect, 10.0, [0.1; 3]);
-		// }
-
-		// painter.set_line_width(1.0);
-		// painter.rounded_rect_outline(button_rect, 10.0, [1.0, 1.0, 1.0]);
-		// painter.rounded_rect_outline(button_rect.translate(Vec2::new(0.25, -62.0)), 10.0, [1.0, 1.0, 1.0]);
-		// painter.rounded_rect_outline(button_rect.translate(Vec2::new(0.5, -124.0)), 10.0, [1.0, 1.0, 1.0]);
-		// painter.rounded_rect_outline(button_rect.translate(Vec2::new(0.75, -186.0)), 10.0, [1.0, 1.0, 1.0]);
-		// painter.rounded_rect_outline(button_rect.translate(Vec2::new(1.0, -248.0)), 10.0, [1.0, 1.0, 1.0]);
-
-		// painter.set_line_width(2.0);
-		// painter.rect_outline(view_bounds.shrink(Vec2::splat(1.0)), [1.0, 0.5, 1.0]);
-
-		// // Menu
-		// let menu_bar_min = view_bounds.min_max_corner() - Vec2::from_y(24.0);
-		// let menu_bounds = Aabb2::new(menu_bar_min, view_bounds.max);
-
-		// painter.rect(menu_bounds, [0.02; 3]);
-
 		self.ui.run(view_bounds, painter, &self.input, |ui| {
 			let frame = ui.add_widget(ui::FrameWidget::horizontal());
 
+			if frame.is_hovered() {
+				frame.widget(|frame| {
+					frame.background_color = Color::grey_a(0.5, 0.1);
+				});
+			}
+
+			let add_widget = || {
+				let frame = ui.add_widget(ui::FrameWidget::horizontal().with_color(Color::green()))
+					.set_constraints(|c| {
+						c.set_size((50.0, 50.0));
+					});
+
+				if frame.is_hovered() {
+					frame.widget(|frame| {
+						frame.background_color = Color::light_green();
+					});
+				}
+
+				frame
+			};
+
 			ui.push_layout(frame);
-			ui.dummy().set_constraints(|c| c.set_size((20.0, 20.0)));
-			ui.dummy().set_constraints(|c| c.set_size((50.0, 50.0)));
-			ui.dummy().set_constraints(|c| c.set_size((100.0, 50.0)));
-			ui.dummy().set_constraints(|c| c.set_size((50.0, 100.0)));
+			add_widget().set_constraints(|c| c.set_size((20.0, 20.0)));
+			add_widget().set_constraints(|c| c.set_size((50.0, 50.0)));
+			add_widget().set_constraints(|c| c.set_size((100.0, 50.0)));
+			add_widget().set_constraints(|c| c.set_size((50.0, 100.0)));
 			ui.pop_layout();
 		});
 

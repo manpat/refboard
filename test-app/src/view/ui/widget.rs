@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use super::{WidgetId, PersistentWidgetId, Ui, Layout, LayoutConstraints, LayoutConstraintMap};
+use super::{WidgetId, Ui, Layout, LayoutConstraints, LayoutConstraintMap};
 
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
@@ -31,7 +31,6 @@ pub trait Widget : AsAny + Debug {
 #[derive(Debug, Copy, Clone)]
 pub struct WidgetRef<'ui, T> {
 	pub widget_id: WidgetId,
-	pub persistent_id: PersistentWidgetId,
 	pub ui: &'ui Ui,
 
 	pub phantom: PhantomData<&'ui T>,
@@ -40,19 +39,22 @@ pub struct WidgetRef<'ui, T> {
 impl<'ui, T> WidgetRef<'ui, T> {
 	pub fn set_constraints(self, mutate: impl FnOnce(&mut LayoutConstraints)) -> Self {
 		let mut lcs = self.ui.layout_constraints.borrow_mut();
-		mutate(lcs.entry(self.widget_id).unwrap().or_default());
+		mutate(lcs.entry(self.widget_id).or_default());
 		self
 	}
 
-	// TODO(pat.m): W could be provided here
 	pub fn widget<R>(&self, mutate: impl FnOnce(&mut T) -> R) -> Option<R>
 		where T: Widget
 	{
 		let mut widgets = self.ui.widgets.borrow_mut();
-		let mut widget = &mut *widgets[self.widget_id];
+		let widget: &mut dyn Widget = &mut **widgets.get_mut(&self.widget_id).unwrap();
 
 		widget.as_any_mut().downcast_mut::<T>()
 			.map(mutate)
+	}
+
+	pub fn is_hovered(&self) -> bool {
+		self.ui.hovered_widget == Some(self.widget_id)
 	}
 }
 

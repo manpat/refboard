@@ -78,7 +78,7 @@ impl Widget for BoxLayout {
 		let mut total_cross_preferred_length = 0.0f32;
 
 		for &child in children {
-			let child_constraints = &constraint_map[child];
+			let child_constraints = &constraint_map[&child];
 
 			let margin_main = child_constraints.margin.axis_sum(main_axis);
 			let margin_cross = child_constraints.margin.axis_sum(cross_axis);
@@ -121,8 +121,8 @@ impl Widget for BoxLayout {
 pub struct FrameWidget<I: Widget> {
 	pub inner: I,
 
-	outline_color: Color,
-	background_color: Color,
+	pub outline_color: Color,
+	pub background_color: Color,
 }
 
 impl<W: Widget> FrameWidget<W> {

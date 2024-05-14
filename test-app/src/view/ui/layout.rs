@@ -2,7 +2,8 @@ use crate::prelude::*;
 use super::{WidgetId};
 
 
-pub type LayoutConstraintMap = SecondaryMap<WidgetId, LayoutConstraints>;
+pub type LayoutConstraintMap = HashMap<WidgetId, LayoutConstraints>;
+pub type LayoutMap = HashMap<WidgetId, Layout>;
 
 
 
@@ -364,8 +365,8 @@ pub fn layout_children_linear(
 	main_axis: Axis,
 	content_alignment: Align,
 	widgets: &[WidgetId],
-	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
-	layouts: &mut SecondaryMap<WidgetId, Layout>)
+	constraints: &LayoutConstraintMap,
+	layouts: &mut LayoutMap)
 {
 	if widgets.is_empty() {
 		return;
@@ -390,8 +391,8 @@ pub fn layout_children_linear(
 fn size_layouts_linear(available_bounds: Aabb2,
 	main_axis: Axis,
 	widgets: &[WidgetId],
-	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
-	layouts: &mut SecondaryMap<WidgetId, Layout>)
+	constraints: &LayoutConstraintMap,
+	layouts: &mut LayoutMap)
 {
 	let mut available_length = match main_axis {
 		Axis::Horizontal => available_bounds.width(),
@@ -401,7 +402,7 @@ fn size_layouts_linear(available_bounds: Aabb2,
 	let mut remaining_widgets = widgets.len();
 
 	for &widget_id in widgets {
-		let constraints = &constraints[widget_id];
+		let constraints = &constraints[&widget_id];
 		available_length -= constraints.margin.axis_sum(main_axis);
 		available_length -= constraints.min_length(main_axis);
 	}
@@ -410,12 +411,12 @@ fn size_layouts_linear(available_bounds: Aabb2,
 		let allocated_extra_length = (available_length / remaining_widgets as f32).max(0.0);
 
 		'current_pass: for &widget_id in widgets {
-			let layout = &mut layouts[widget_id];
+			let layout = layouts.get_mut(&widget_id).unwrap();
 			if layout.final_size {
 				continue 'current_pass;
 			}
 
-			let constraints = &constraints[widget_id];
+			let constraints = &constraints[&widget_id];
 
 			let min_length = constraints.min_length(main_axis);
 			let max_length = constraints.max_length(main_axis);
@@ -446,8 +447,8 @@ fn size_layouts_linear(available_bounds: Aabb2,
 fn size_layouts_overlapping(available_bounds: Aabb2,
 	main_axis: Axis,
 	widgets: &[WidgetId],
-	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
-	layouts: &mut SecondaryMap<WidgetId, Layout>)
+	constraints: &LayoutConstraintMap,
+	layouts: &mut LayoutMap)
 {
 	let available_length = match main_axis {
 		Axis::Horizontal => available_bounds.width(),
@@ -455,8 +456,8 @@ fn size_layouts_overlapping(available_bounds: Aabb2,
 	};
 
 	for &widget_id in widgets {
-		let layout = &mut layouts[widget_id];
-		let constraints = &constraints[widget_id];
+		let layout = layouts.get_mut(&widget_id).unwrap();
+		let constraints = &constraints[&widget_id];
 
 		let margin = constraints.margin.axis_sum(main_axis);
 
@@ -476,8 +477,8 @@ fn size_layouts_overlapping(available_bounds: Aabb2,
 fn position_layouts_linear(available_bounds: Aabb2,
 	axis: Axis,
 	widgets: &[WidgetId],
-	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
-	layouts: &mut SecondaryMap<WidgetId, Layout>)
+	constraints: &LayoutConstraintMap,
+	layouts: &mut LayoutMap)
 {
 	let mut cursor = match axis {
 		Axis::Horizontal => available_bounds.min.x,
@@ -485,8 +486,8 @@ fn position_layouts_linear(available_bounds: Aabb2,
 	};
 
 	for &widget_id in widgets {
-		let constraints = &constraints[widget_id];
-		let layout = &mut layouts[widget_id];
+		let constraints = &constraints[&widget_id];
+		let layout = layouts.get_mut(&widget_id).unwrap();
 
 		let (leading_margin, trailing_margin, length) = match axis {
 			Axis::Horizontal => (constraints.margin.left.get(), constraints.margin.right.get(), layout.size.x),
@@ -509,8 +510,8 @@ fn position_layouts_overlapping(available_bounds: Aabb2,
 	axis: Axis,
 	content_alignment: Align,
 	widgets: &[WidgetId],
-	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
-	layouts: &mut SecondaryMap<WidgetId, Layout>)
+	constraints: &LayoutConstraintMap,
+	layouts: &mut LayoutMap)
 {
 	let (start, end) = match axis {
 		Axis::Horizontal => (available_bounds.min.x, available_bounds.max.x),
@@ -518,8 +519,8 @@ fn position_layouts_overlapping(available_bounds: Aabb2,
 	};
 
 	for &widget_id in widgets {
-		let constraints = &constraints[widget_id];
-		let layout = &mut layouts[widget_id];
+		let constraints = &constraints[&widget_id];
+		let layout = layouts.get_mut(&widget_id).unwrap();
 
 		let alignment = constraints.self_alignment.get_or(content_alignment);
 
@@ -544,12 +545,12 @@ fn position_layouts_overlapping(available_bounds: Aabb2,
 
 fn calculate_bounds(
 	widgets: &[WidgetId],
-	constraints: &SecondaryMap<WidgetId, LayoutConstraints>,
-	layouts: &mut SecondaryMap<WidgetId, Layout>)
+	constraints: &LayoutConstraintMap,
+	layouts: &mut LayoutMap)
 {
 	for &widget_id in widgets {
-		let constraints = &constraints[widget_id];
-		let layout = &mut layouts[widget_id];
+		let constraints = &constraints[&widget_id];
+		let layout = layouts.get_mut(&widget_id).unwrap();
 
 		let box_bounds = Aabb2::new(layout.position, layout.position + layout.size);
 		let content_bounds = inset_lengths(&box_bounds, &constraints.padding);

@@ -4,7 +4,7 @@ use super::{WidgetId};
 
 #[derive(Default, Debug)]
 pub struct Hierarchy {
-	pub info: SecondaryMap<WidgetId, HierarchyNode>,
+	pub info: HashMap<WidgetId, HierarchyNode>,
 	pub root_nodes: Vec<WidgetId>,
 }
 
@@ -19,7 +19,7 @@ impl Hierarchy {
 		let parent = parent.into();
 
 		if let Some(parent) = parent {
-			self.info[parent].children.push(widget_id);
+			self.info.get_mut(&parent).unwrap().children.push(widget_id);
 		} else {
 			self.root_nodes.push(widget_id);
 		}
@@ -29,12 +29,12 @@ impl Hierarchy {
 	}
 
 	pub fn parent(&self, widget_id: WidgetId) -> Option<WidgetId> {
-		self.info[widget_id].parent
+		self.info[&widget_id].parent
 	}
 
 	pub fn children(&self, widget_id: impl Into<Option<WidgetId>>) -> &[WidgetId] {
 		match widget_id.into() {
-			Some(widget_id) => self.info[widget_id].children.as_slice(),
+			Some(widget_id) => self.info[&widget_id].children.as_slice(),
 			None => self.root_nodes.as_slice(),
 		}
 	}
@@ -44,7 +44,7 @@ impl Hierarchy {
 	{
 		let start = start.into();
 		let children = match start {
-			Some(widget_id) => self.info[widget_id].children.as_slice(),
+			Some(widget_id) => self.info[&widget_id].children.as_slice(),
 			None => self.root_nodes.as_slice(),
 		};
 
@@ -54,7 +54,7 @@ impl Hierarchy {
 		visit_queue.extend(children.into_iter());
 
 		while let Some(parent) = visit_queue.pop_front() {
-			let children = self.info[parent].children.as_slice();
+			let children = self.info[&parent].children.as_slice();
 			visit_queue.extend(children.iter().copied());
 
 			visit(parent, children);
@@ -85,7 +85,7 @@ impl Hierarchy {
 				continue
 			}
 
-			let children = self.info[parent].children.as_slice();
+			let children = self.info[&parent].children.as_slice();
 			if children.is_empty() {
 				visit(parent);
 				continue
