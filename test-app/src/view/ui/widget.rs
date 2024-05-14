@@ -56,6 +56,10 @@ impl<'ui, T> WidgetRef<'ui, T> {
 	pub fn is_hovered(&self) -> bool {
 		self.ui.hovered_widget == Some(self.widget_id)
 	}
+
+	pub fn is_clicked(&self) -> bool {
+		self.is_hovered() && self.ui.click_happened
+	}
 }
 
 impl<'ui, T> From<&'_ WidgetRef<'ui, T>> for WidgetId {

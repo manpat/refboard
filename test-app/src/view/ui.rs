@@ -33,6 +33,7 @@ impl System {
 	pub fn run(&mut self, bounds: Aabb2, painter: &mut Painter, input: &Input, build_ui: impl FnOnce(&Ui)) {
 		let mut ui = Ui::new();
 		ui.hovered_widget = self.hovered_widget;
+		ui.click_happened = input.click_received;
 
 		// TODO(pat.m): handle input first, using cached input handlers from previous frame
 
@@ -67,6 +68,7 @@ pub struct Ui {
 	widget_layouts: LayoutMap,
 
 	hovered_widget: Option<WidgetId>,
+	click_happened: bool,
 }
 
 impl Ui {
@@ -91,6 +93,7 @@ impl Ui {
 			widget_layouts: LayoutMap::new(),
 
 			hovered_widget: None,
+			click_happened: false,
 		}
 	}
 
@@ -156,10 +159,6 @@ impl Ui {
 			.visit_breadth_first(None, |widget_id, _| {
 				let layout = &self.widget_layouts[&widget_id];
 				self.widgets.borrow_mut().get_mut(&widget_id).unwrap().draw(painter, layout);
-
-				// if self.hovered_widget == Some(widget_id) {
-				// 	painter.rect_outline(layout.box_bounds, Color::light_blue());
-				// }
 			});
 	}
 }

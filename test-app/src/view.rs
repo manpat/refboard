@@ -12,7 +12,6 @@ pub struct View {
 	pub ui: ui::System,
 
 	should_redraw: bool,
-	time: f32,
 }
 
 impl View {
@@ -24,7 +23,6 @@ impl View {
 			viewport: Viewport::default(),
 			input,
 			ui,
-			time: 0.0,
 			should_redraw: true,
 		}
 	}
@@ -57,26 +55,27 @@ impl View {
 				});
 			}
 
-			let add_widget = || {
-				let frame = ui.add_widget(ui::FrameWidget::horizontal().with_color(Color::green()))
-					.set_constraints(|c| {
-						c.set_size((50.0, 50.0));
-					});
+			let add_widget = |idx| {
+				let frame = ui.add_widget(ui::FrameWidget::horizontal().with_color(Color::green().with_alpha(0.2)));
 
 				if frame.is_hovered() {
 					frame.widget(|frame| {
-						frame.background_color = Color::light_green();
+						frame.background_color = Color::green();
 					});
+				}
+
+				if frame.is_clicked() {
+					println!("CLICK! {idx}");
 				}
 
 				frame
 			};
 
 			ui.push_layout(frame);
-			add_widget().set_constraints(|c| c.set_size((20.0, 20.0)));
-			add_widget().set_constraints(|c| c.set_size((50.0, 50.0)));
-			add_widget().set_constraints(|c| c.set_size((100.0, 50.0)));
-			add_widget().set_constraints(|c| c.set_size((50.0, 100.0)));
+			add_widget(0).set_constraints(|c| c.set_size((20.0, 20.0)));
+			add_widget(1).set_constraints(|c| c.set_size((50.0, 50.0)));
+			add_widget(2).set_constraints(|c| c.set_size((100.0, 50.0)));
+			add_widget(3).set_constraints(|c| c.set_size((50.0, 100.0)));
 			ui.pop_layout();
 		});
 
@@ -85,7 +84,6 @@ impl View {
 			painter.circle(cursor_pos, 3.0, [1.0, 0.0, 0.0]);
 		}
 
-		self.time += 1.0/60.0;
 	}
 
 	pub fn should_redraw(&self) -> bool {
@@ -96,7 +94,7 @@ impl View {
 
 
 
-use winit::event::WindowEvent;
+use winit::event::{WindowEvent, ElementState, MouseButton};
 use winit::dpi::PhysicalPosition;
 
 #[derive(Default)]
@@ -104,6 +102,7 @@ pub struct Input {
 	raw_cursor_pos: Option<Vec2>,
 
 	pub cursor_pos_view: Option<Vec2>,
+	pub click_received: bool,
 
 	pub events_received_this_frame: bool,
 }
@@ -111,6 +110,7 @@ pub struct Input {
 impl Input {
 	pub fn prepare_frame(&mut self) {
 		self.cursor_pos_view = None;
+		self.click_received = false;
 		self.events_received_this_frame = false;
 	}
 
@@ -133,6 +133,11 @@ impl Input {
 
 			WindowEvent::CursorLeft { .. } => {
 				self.raw_cursor_pos = None;
+			}
+
+			WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => {
+				// TODO(pat.m): better
+				self.click_received = true;
 			}
 
 			_ => {}
