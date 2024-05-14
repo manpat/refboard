@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use super::{WidgetId, Ui, Layout, LayoutConstraints, LayoutConstraintMap};
+use super::{WidgetId, PersistentWidgetId, Ui, Layout, LayoutConstraints, LayoutConstraintMap};
 
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
@@ -14,29 +14,24 @@ pub struct ConstraintContext<'a> {
 }
 
 
-pub trait AsAny : Any {
-	fn as_any(&self) -> &dyn Any;
-	fn as_any_mut(&mut self) -> &mut dyn Any;
+bitflags! {
+	pub struct InputBehaviour : u8 {
+		const DUMMY = 1;
+	}
 }
 
-impl<T> AsAny for T
-	where T: Any
-{
-	fn as_any(&self) -> &dyn Any { self }
-	fn as_any_mut(&mut self) -> &mut dyn Any { self }
-}
 
 pub trait Widget : AsAny + Debug {
-	fn calculate_constraints(&self, _: ConstraintContext<'_>) {}
-
+	fn input_behaviour(&self) -> InputBehaviour { InputBehaviour::DUMMY }
+	fn constrain(&self, _: ConstraintContext<'_>) {}
 	fn draw(&self, _painter: &mut Painter, _layout: &Layout) {}
 }
-
 
 
 #[derive(Debug, Copy, Clone)]
 pub struct WidgetRef<'ui, T> {
 	pub widget_id: WidgetId,
+	pub persistent_id: PersistentWidgetId,
 	pub ui: &'ui Ui,
 
 	pub phantom: PhantomData<&'ui T>,

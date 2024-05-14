@@ -6,7 +6,7 @@ use std::fmt::{self, Debug};
 
 
 impl Widget for () {
-	fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
+	fn constrain(&self, ctx: ConstraintContext<'_>) {
 		ctx.constraints.margin.set_default(4.0);
 		ctx.constraints.padding.set_default(8.0);
 
@@ -63,7 +63,7 @@ impl BoxLayout {
 }
 
 impl Widget for BoxLayout {
-	fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
+	fn constrain(&self, ctx: ConstraintContext<'_>) {
 		let ConstraintContext { constraints, children, constraint_map } = ctx;
 
 		constraints.layout_axis.set_default(self.axis);
@@ -153,8 +153,8 @@ impl FrameWidget<BoxLayout> {
 impl<W> Widget for FrameWidget<W>
 	where W: Widget
 {
-	fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
-		self.inner.calculate_constraints(ctx);
+	fn constrain(&self, ctx: ConstraintContext<'_>) {
+		self.inner.constrain(ctx);
 	}
 
 	fn draw(&self, painter: &mut Painter, layout: &Layout) {
@@ -174,7 +174,7 @@ impl<W> Widget for FrameWidget<W>
 pub struct Spring(pub Axis);
 
 impl Widget for Spring {
-	fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
+	fn constrain(&self, ctx: ConstraintContext<'_>) {
 		ctx.constraints.size_policy_mut(self.0).set_default(SizingBehaviour::FLEXIBLE);
 		ctx.constraints.size_policy_mut(self.0.opposite()).set_default(SizingBehaviour::FIXED);
 		ctx.constraints.self_alignment.set_default(Align::Middle);

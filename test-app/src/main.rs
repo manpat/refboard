@@ -15,11 +15,14 @@ pub mod renderer;
 pub mod painter;
 pub mod app;
 pub mod view;
+pub mod util;
 
 pub mod prelude {
 	pub use common::*;
 
 	pub use super::{painter, renderer, app, view};
+	pub use super::util::*;
+	
 	pub use painter::Painter;
 	pub use app::{ItemKey, ImageKey};
 

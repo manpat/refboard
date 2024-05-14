@@ -10,10 +10,17 @@ pub use widgets::*;
 pub use layout::*;
 pub use hierarchy::*;
 
+use super::Input;
+
+use std::any::TypeId;
 use std::marker::PhantomData;
+use std::hash::{DefaultHasher, Hasher, Hash};
+use std::cell::Cell;
 
 
-pub struct System {}
+pub struct System {
+
+}
 
 impl System {
 	pub fn new() -> System {
@@ -21,11 +28,15 @@ impl System {
 	}
 
 	// TODO(pat.m): could this be built around the same mechanism as std::thread::scope?
-	pub fn run(&mut self, bounds: Aabb2, painter: &mut Painter, build_ui: impl FnOnce(&Ui)) {
+	pub fn run(&mut self, bounds: Aabb2, painter: &mut Painter, input: &Input, build_ui: impl FnOnce(&Ui)) {
 		let mut ui = Ui::new();
+
+		// TODO(pat.m): handle input first, using cached input handlers from previous frame
+
 		build_ui(&ui);
 
 		ui.layout(bounds);
+		ui.handle_input(input);
 		ui.draw(painter);
 	}
 }
@@ -47,6 +58,8 @@ pub struct Ui {
 	layout_constraints: RefCell<LayoutConstraintMap>,
 
 	widget_layouts: SecondaryMap<WidgetId, Layout>,
+
+	hovered_widget: Option<WidgetId>,
 }
 
 impl Ui {
@@ -68,6 +81,8 @@ impl Ui {
 			layout_constraints: LayoutConstraintMap::default().into(),
 
 			widget_layouts: SecondaryMap::new(),
+
+			hovered_widget: None,
 		}
 	}
 
@@ -84,7 +99,7 @@ impl Ui {
 			let mut constraints = layout_constraints.get(widget_id).cloned().unwrap_or_default();
 			let children = hierarchy.children(widget_id);
 
-			self.widgets.borrow_mut()[widget_id].calculate_constraints(ConstraintContext {
+			self.widgets.borrow_mut()[widget_id].constrain(ConstraintContext {
 				constraints: &mut constraints,
 				children,
 				constraint_map: &mut layout_constraints,
@@ -113,11 +128,30 @@ impl Ui {
 		});
 	}
 
+	pub fn handle_input(&mut self, input: &Input) {
+		self.hovered_widget = None;
+
+		if let Some(cursor_pos) = input.cursor_pos_view {
+			self.hierarchy.borrow()
+				.visit_breadth_first(None, |widget_id, _| {
+					let box_bounds = self.widget_layouts[widget_id].box_bounds;
+					if box_bounds.contains_point(cursor_pos) {
+						self.hovered_widget = Some(widget_id);
+					}
+				});
+		}
+	}
+
 	pub fn draw(&mut self, painter: &mut Painter) {
 		// draw from root to leaves
 		self.hierarchy.borrow()
 			.visit_breadth_first(None, |widget_id, _| {
-				self.widgets.borrow_mut()[widget_id].draw(painter, &self.widget_layouts[widget_id]);
+				let layout = &self.widget_layouts[widget_id];
+				self.widgets.borrow_mut()[widget_id].draw(painter, layout);
+
+				if self.hovered_widget == Some(widget_id) {
+					painter.rect_outline(layout.box_bounds, Color::light_blue());
+				}
 			});
 	}
 }
@@ -138,12 +172,24 @@ impl Ui {
 	pub fn add_widget_to<T>(&self, widget: T, parent_id: impl Into<Option<WidgetId>>) -> WidgetRef<'_, T>
 		where T: Widget + 'static
 	{
+		let mut hierarchy = self.hierarchy.borrow_mut();
+
+		let parent_id = parent_id.into();
+		let type_id = TypeId::of::<T>();
+		let widget_number = hierarchy.children(parent_id).len();
+
+		let mut hasher = DefaultHasher::new();
+		parent_id.hash(&mut hasher);
+		type_id.hash(&mut hasher);
+		hasher.write_usize(widget_number);
+		let persistent_id = PersistentWidgetId(hasher.finish());
+
+		// println!("Widget hash {widget:?} -> {}", hasher.finish());
+
 		let widget_id = self.widgets.borrow_mut().insert(Box::new(widget));
-		self.hierarchy.borrow_mut().add(widget_id, parent_id.into());
+		hierarchy.add(widget_id, parent_id);
 
-		// TODO(pat.m): calc some kind of key that can be used across frames for input purposes
-
-		WidgetRef { widget_id, ui: self, phantom: PhantomData }
+		WidgetRef { widget_id, persistent_id, ui: self, phantom: PhantomData }
 	}
 
 	pub fn mutate_widget_constraints(&self, widget_id: impl Into<WidgetId>, mutate: impl FnOnce(&mut LayoutConstraints)) {
@@ -171,3 +217,8 @@ impl Ui {
 		self.add_widget(Spring(axis))
 	}
 }
+
+
+
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+pub struct PersistentWidgetId(u64);

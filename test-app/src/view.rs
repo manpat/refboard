@@ -73,22 +73,8 @@ impl View {
 
 		// painter.rect(menu_bounds, [0.02; 3]);
 
-		let button_rect = Aabb2::new(Vec2::new(0.0, 0.0), Vec2::new(100.0, 100.0));
-
-
-		self.ui.run(view_bounds, painter, |ui| {
-
-			let color = if let Some(cursor_pos) = self.input.cursor_pos_view
-				&& button_rect.contains_point(cursor_pos)
-			{
-				[0.07; 3]
-			} else {
-				[0.03; 3]
-			};
-
-			let frame = ui.add_widget(ui::FrameWidget::horizontal().with_color(color));
-
-			frame.widget(|widget| widget.inner.axis = ui::Axis::Vertical);
+		self.ui.run(view_bounds, painter, &self.input, |ui| {
+			let frame = ui.add_widget(ui::FrameWidget::horizontal());
 
 			ui.push_layout(frame);
 			ui.dummy().set_constraints(|c| c.set_size((20.0, 20.0)));
@@ -97,9 +83,6 @@ impl View {
 			ui.dummy().set_constraints(|c| c.set_size((50.0, 100.0)));
 			ui.pop_layout();
 		});
-
-		painter.rect_outline(button_rect, [0.0, 0.0, 1.0]);
-
 
 		// Cursor
 		if let Some(cursor_pos) = self.input.cursor_pos_view {
@@ -125,7 +108,6 @@ pub struct Input {
 	raw_cursor_pos: Option<Vec2>,
 
 	pub cursor_pos_view: Option<Vec2>,
-	pub cursor_pos_board: Option<Vec2>,
 
 	pub events_received_this_frame: bool,
 }
@@ -133,17 +115,13 @@ pub struct Input {
 impl Input {
 	pub fn prepare_frame(&mut self) {
 		self.cursor_pos_view = None;
-		self.cursor_pos_board = None;
 		self.events_received_this_frame = false;
 	}
 
 	pub fn process_events(&mut self, viewport: &Viewport) {
 		if let Some(raw_pos) = self.raw_cursor_pos {
 			let view_pos = viewport.physical_to_view() * raw_pos;
-			let board_pos = viewport.view_to_board() * view_pos;
-
 			self.cursor_pos_view = Some(view_pos);
-			self.cursor_pos_board = Some(board_pos);
 		}
 	}
 
@@ -171,26 +149,13 @@ impl Input {
 #[derive(Debug, Default)]
 pub struct Viewport {
 	pub size: Vec2,
-	pub centre: Vec2,
-	pub zoom: f32,
 }
 
 impl Viewport {
 	pub fn new() -> Viewport {
 		Viewport {
 			size: Vec2::zero(),
-			centre: Vec2::zero(),
-			zoom: 1.0,
 		}
-	}
-
-	pub fn board_to_view(&self) -> Mat2x3 {
-		let scale = self.zoom.recip();
-		Mat2x3::scale_translate(Vec2::splat(scale), -self.centre * scale)
-	}
-
-	pub fn view_to_board(&self) -> Mat2x3 {
-		Mat2x3::scale_translate(Vec2::splat(self.zoom), self.centre)
 	}
 
 	pub fn view_to_clip(&self) -> Mat2x3 {
