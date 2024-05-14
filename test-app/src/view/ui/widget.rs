@@ -1,7 +1,8 @@
 use crate::prelude::*;
 use super::{WidgetId, Layout, LayoutConstraints, LayoutConstraintMap};
 
-use std::cell::{Ref, RefMut};
+use std::any::Any;
+use std::fmt::Debug;
 
 
 pub struct ConstraintContext<'a> {
@@ -11,7 +12,19 @@ pub struct ConstraintContext<'a> {
 }
 
 
-pub trait Widget : std::fmt::Debug {
+pub trait Widget : Any + Debug {
+	fn as_any(&self) -> &dyn Any
+		where Self: Sized
+	{
+		self as &dyn Any
+	}
+
+	fn as_any_mut(&mut self) -> &mut dyn Any
+		where Self: Sized
+	{
+		self as &mut dyn Any
+	}
+
 	fn calculate_constraints(&self, _: ConstraintContext<'_>) {}
 
 	fn draw(&self, painter: &mut Painter, layout: &Layout) {

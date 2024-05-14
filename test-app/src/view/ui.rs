@@ -1,10 +1,12 @@
 use crate::prelude::*;
 
 pub mod widget;
+pub mod widgets;
 pub mod layout;
 pub mod hierarchy;
 
 pub use widget::*;
+pub use widgets::*;
 pub use layout::*;
 pub use hierarchy::*;
 
@@ -166,9 +168,9 @@ impl Ui {
 
 		impl Widget for Spring {
 			fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
-				ctx.constraints.size_policy_mut(self.0).set(SizingBehaviour::FLEXIBLE);
-				ctx.constraints.size_policy_mut(self.0.opposite()).set(SizingBehaviour::FIXED);
-				ctx.constraints.self_alignment.set(Align::Middle);
+				ctx.constraints.size_policy_mut(self.0).set_default(SizingBehaviour::FLEXIBLE);
+				ctx.constraints.size_policy_mut(self.0.opposite()).set_default(SizingBehaviour::FIXED);
+				ctx.constraints.self_alignment.set_default(Align::Middle);
 			}
 		}
 
@@ -176,106 +178,6 @@ impl Ui {
 	}
 }
 
-
-
-impl Widget for () {
-	fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
-		ctx.constraints.margin.set_default(16.0);
-		ctx.constraints.padding.set_default(16.0);
-
-		ctx.constraints.horizontal_size_policy.set_default(SizingBehaviour::FLEXIBLE);
-	}
-
-	fn draw(&self, painter: &mut Painter, layout: &Layout) {
-		let widget_color = [0.5; 3];
-		painter.rounded_rect_outline(layout.box_bounds, 8.0, widget_color);
-		painter.line(layout.box_bounds.min, layout.box_bounds.max, widget_color);
-		painter.line(layout.box_bounds.min_max_corner(), layout.box_bounds.max_min_corner(), widget_color);
-
-		painter.rounded_rect_outline(layout.margin_bounds, 8.0, [0.1, 0.5, 1.0, 0.5]);
-		painter.rounded_rect_outline(layout.content_bounds, 8.0, [0.5, 1.0, 0.5, 0.5]);
-	}
-}
-
-
-#[derive(Debug)]
-pub struct BoxLayout {
-	pub axis: Axis,
-}
-
-impl BoxLayout {
-	pub fn horizontal() -> Self {
-		BoxLayout { axis: Axis::Horizontal }
-	}
-
-	pub fn vertical() -> Self {
-		BoxLayout { axis: Axis::Vertical }
-	}
-}
-
-impl Widget for BoxLayout {
-	fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
-		let ConstraintContext { constraints, children, constraint_map } = ctx;
-
-		constraints.layout_axis.set_default(self.axis);
-
-		let main_axis = constraints.layout_axis.get();
-		let cross_axis = main_axis.opposite();
-
-		let mut total_main_min_length = 0.0f32;
-		let mut total_cross_min_length = 0.0f32;
-
-		let mut total_main_preferred_length = 0.0f32;
-		let mut total_cross_preferred_length = 0.0f32;
-
-		for &child in children {
-			let child_constraints = &constraint_map[child];
-
-			let margin_main = child_constraints.margin.axis_sum(main_axis);
-			let margin_cross = child_constraints.margin.axis_sum(cross_axis);
-
-			let min_length = child_constraints.min_length(main_axis);
-			let preferred_length = child_constraints.preferred_length(main_axis);
-
-			total_main_min_length += min_length + margin_main;
-			total_main_preferred_length += preferred_length + margin_main;
-
-			total_cross_min_length = total_cross_min_length.max(child_constraints.min_length(cross_axis) + margin_cross);
-			total_cross_preferred_length = total_cross_preferred_length.max(child_constraints.preferred_length(cross_axis) + margin_cross);
-		}
-
-		constraints.padding.set_default(8.0);
-
-		let padding_main = constraints.padding.axis_sum(main_axis);
-		let padding_cross = constraints.padding.axis_sum(cross_axis);
-
-		total_main_min_length += padding_main;
-		total_cross_min_length += padding_cross;
-
-		total_main_preferred_length += padding_main;
-		total_cross_preferred_length += padding_cross;
-
-		constraints.min_length_mut(main_axis).set_default(total_main_min_length);
-		constraints.min_length_mut(cross_axis).set_default(total_cross_min_length);
-
-		constraints.preferred_length_mut(main_axis).set_default(total_main_preferred_length);
-		constraints.preferred_length_mut(cross_axis).set_default(total_cross_preferred_length);
-
-		constraints.size_policy_mut(main_axis).set_default(SizingBehaviour::FLEXIBLE);
-		constraints.size_policy_mut(cross_axis).set_default(SizingBehaviour::FLEXIBLE);
-	}
-
-	fn draw(&self, painter: &mut Painter, layout: &Layout) {
-		let widget_color = Color::grey_a(1.0, 0.01);
-		painter.rounded_rect(layout.box_bounds, 8.0, widget_color);
-		painter.rounded_rect_outline(layout.box_bounds, 8.0, Color::grey_a(1.0, 0.04));
-		// painter.line(layout.box_bounds.min, layout.box_bounds.max, widget_color);
-		// painter.line(layout.box_bounds.min_max_corner(), layout.box_bounds.max_min_corner(), widget_color);
-
-		painter.rounded_rect_outline(layout.content_bounds, 8.0, [0.1, 0.4, 0.1]);
-		painter.rounded_rect_outline(layout.margin_bounds, 8.0, [0.1, 0.1, 0.4]);
-	}
-}
 
 
 

@@ -73,7 +73,7 @@ impl View {
 
 		// painter.rect(menu_bounds, [0.02; 3]);
 
-		self.ui.run(view_bounds.shrink(Vec2::splat(10.0)), painter, |ui| {
+		self.ui.run(view_bounds, painter, |ui| {
 			use ui::SizingBehaviour;
 
 			ui.dummy().set_constraints(|lc| {
@@ -88,7 +88,7 @@ impl View {
 
 			let inner_layout = ui.add_widget(ui::BoxLayout::vertical())
 				.set_constraints(|lc| {
-					lc.horizontal_size_policy.set(SizingBehaviour::FLEXIBLE);
+					lc.horizontal_size_policy.set(SizingBehaviour::CAN_SHRINK);
 					lc.vertical_size_policy.set(SizingBehaviour::FIXED);
 					lc.max_width.set(300.0);
 					lc.content_alignment.set(ui::Align::Middle);
@@ -101,16 +101,25 @@ impl View {
 				lc.preferred_width.set(100.0);
 				lc.min_width.set(40.0);
 				// lc.max_width.set(250.0);
-				lc.set_height(40.0);
+				lc.set_height(120.0);
 				lc.horizontal_size_policy.set(SizingBehaviour::CAN_SHRINK);
 			});
 
-			ui.dummy().set_constraints(|lc| {
+			ui.add_widget(ui::DrawFnWidget(|painter, layout| {
+				let bounds = layout.content_bounds;
+				let radius = bounds.width().min(bounds.height())/2.0;
+
+				painter.rect_outline(bounds, Color::green().with_alpha(0.1));
+				painter.circle(bounds.center(), radius, Color::cyan());
+			}))
+			.set_constraints(|lc| {
 				lc.min_width.set(40.0);
-				lc.max_width.set(250.0);
-				lc.set_height(64.0);
+				lc.min_height.set(40.0);
+				lc.preferred_width.set(100.0);
+				lc.preferred_height.set(100.0);
 				// lc.preferred_width.set(10.0);
-				lc.horizontal_size_policy.set(SizingBehaviour::FLEXIBLE);
+				lc.horizontal_size_policy.set(SizingBehaviour::CAN_SHRINK);
+				lc.vertical_size_policy.set(SizingBehaviour::CAN_SHRINK);
 			});
 
 			ui.pop_layout();
