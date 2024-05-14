@@ -88,7 +88,7 @@ impl View {
 
 			let frame = ui.add_widget(ui::FrameWidget::horizontal().with_color(color));
 
-			frame.widget(|w: &mut ui::FrameWidget<ui::BoxLayout>| w.inner.axis = ui::Axis::Vertical);
+			frame.widget(|widget| widget.inner.axis = ui::Axis::Vertical);
 
 			ui.push_layout(frame);
 			ui.dummy().set_constraints(|c| c.set_size((20.0, 20.0)));

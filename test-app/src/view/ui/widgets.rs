@@ -167,3 +167,18 @@ impl<W> Widget for FrameWidget<W>
 	}
 }
 
+
+
+
+#[derive(Debug)]
+pub struct Spring(pub Axis);
+
+impl Widget for Spring {
+	fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
+		ctx.constraints.size_policy_mut(self.0).set_default(SizingBehaviour::FLEXIBLE);
+		ctx.constraints.size_policy_mut(self.0.opposite()).set_default(SizingBehaviour::FIXED);
+		ctx.constraints.self_alignment.set_default(Align::Middle);
+	}
+}
+
+

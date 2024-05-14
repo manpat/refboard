@@ -10,6 +10,8 @@ pub use widgets::*;
 pub use layout::*;
 pub use hierarchy::*;
 
+use std::marker::PhantomData;
+
 
 pub struct System {}
 
@@ -127,17 +129,21 @@ impl Ui {
 			.expect("Stack empty")
 	}
 
-	pub fn add_widget(&self, widget: impl Widget + 'static) -> WidgetRef<'_> {
+	pub fn add_widget<T>(&self, widget: T) -> WidgetRef<'_, T>
+		where T: Widget + 'static
+	{
 		self.add_widget_to(widget, self.parent_id())
 	}
 
-	pub fn add_widget_to(&self, widget: impl Widget + 'static, parent_id: impl Into<Option<WidgetId>>) -> WidgetRef<'_> {
+	pub fn add_widget_to<T>(&self, widget: T, parent_id: impl Into<Option<WidgetId>>) -> WidgetRef<'_, T>
+		where T: Widget + 'static
+	{
 		let widget_id = self.widgets.borrow_mut().insert(Box::new(widget));
 		self.hierarchy.borrow_mut().add(widget_id, parent_id.into());
 
 		// TODO(pat.m): calc some kind of key that can be used across frames for input purposes
 
-		WidgetRef { widget_id, ui: self }
+		WidgetRef { widget_id, ui: self, phantom: PhantomData }
 	}
 
 	pub fn mutate_widget_constraints(&self, widget_id: impl Into<WidgetId>, mutate: impl FnOnce(&mut LayoutConstraints)) {
@@ -156,29 +162,12 @@ impl Ui {
 
 
 impl Ui {
-	pub fn dummy(&self) -> WidgetRef<'_> {
+	pub fn dummy(&self) -> WidgetRef<'_, ()> {
 		self.add_widget(())
 	}
 
-	pub fn spring(&self, axis: Axis) -> WidgetRef<'_> {
-		#[derive(Debug)]
-		struct Spring(Axis);
-
+	pub fn spring(&self, axis: Axis) -> WidgetRef<'_, Spring> {
 		// TODO(pat.m): can I derive Axis from context?
-
-		impl Widget for Spring {
-			fn calculate_constraints(&self, ctx: ConstraintContext<'_>) {
-				ctx.constraints.size_policy_mut(self.0).set_default(SizingBehaviour::FLEXIBLE);
-				ctx.constraints.size_policy_mut(self.0.opposite()).set_default(SizingBehaviour::FIXED);
-				ctx.constraints.self_alignment.set_default(Align::Middle);
-			}
-		}
-
 		self.add_widget(Spring(axis))
 	}
 }
-
-
-
-
-
