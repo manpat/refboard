@@ -15,24 +15,22 @@ use super::Input;
 use std::any::TypeId;
 use std::marker::PhantomData;
 use std::hash::{DefaultHasher, Hasher, Hash};
-// use std::cell::Cell;
 
 
 pub struct System {
-	hovered_widget: Option<WidgetId>,
+	persistent_state: PersistentState,
 }
 
 impl System {
 	pub fn new() -> System {
 		System {
-			hovered_widget: None,
+			persistent_state: PersistentState::default(),
 		}
 	}
 
 	// TODO(pat.m): could this be built around the same mechanism as std::thread::scope?
-	pub fn run(&mut self, bounds: Aabb2, painter: &mut Painter, input: &Input, build_ui: impl FnOnce(&Ui)) {
-		let mut ui = Ui::new();
-		ui.hovered_widget = self.hovered_widget;
+	pub fn run(&mut self, bounds: Aabb2, painter: &mut Painter, input: &Input, build_ui: impl FnOnce(&Ui<'_>)) {
+		let mut ui = Ui::new(&self.persistent_state);
 		ui.click_happened = input.click_received;
 
 		// TODO(pat.m): handle input first, using cached input handlers from previous frame
@@ -42,12 +40,13 @@ impl System {
 		ui.layout(bounds);
 		ui.handle_input(input);
 		ui.draw(painter);
-
-		self.hovered_widget = ui.hovered_widget;
 	}
 }
 
-
+#[derive(Debug, Default)]
+pub struct PersistentState {
+	hovered_widget: Cell<Option<WidgetId>>,
+}
 
 type WidgetContainer = HashMap<WidgetId, Box<dyn Widget>>;
 
@@ -58,7 +57,7 @@ pub struct WidgetId(u64);
 
 
 #[derive(Debug)]
-pub struct Ui {
+pub struct Ui<'ps> {
 	// TODO(pat.m): most of this shouldn't be slotmaps - we never remove widgets within a frame so their index is stable
 	widgets: RefCell<WidgetContainer>,
 	hierarchy: RefCell<Hierarchy>,
@@ -67,15 +66,14 @@ pub struct Ui {
 
 	widget_layouts: LayoutMap,
 
-	// TODO(pat.m): Set in Persistent state, not here
-	hovered_widget: Option<WidgetId>,
-
 	// TODO(pat.m): take directly from Input
 	click_happened: bool,
+
+	persistent_state: &'ps PersistentState,
 }
 
-impl Ui {
-	pub fn new() -> Ui {
+impl<'ps> Ui<'ps> {
+	pub fn new(persistent_state: &'ps PersistentState) -> Ui<'ps> {
 		let widgets = WidgetContainer::default();
 		let hierarchy = Hierarchy::default();
 		let stack = Vec::new();
@@ -88,8 +86,9 @@ impl Ui {
 
 			widget_layouts: LayoutMap::new(),
 
-			hovered_widget: None,
 			click_happened: false,
+
+			persistent_state,
 		}
 	}
 
@@ -136,14 +135,14 @@ impl Ui {
 	}
 
 	pub fn handle_input(&mut self, input: &Input) {
-		self.hovered_widget = None;
+		self.persistent_state.hovered_widget.set(None);
 
 		if let Some(cursor_pos) = input.cursor_pos_view {
 			self.hierarchy.borrow()
 				.visit_breadth_first(None, |widget_id, _| {
 					let box_bounds = self.widget_layouts[&widget_id].box_bounds;
 					if box_bounds.contains_point(cursor_pos) {
-						self.hovered_widget = Some(widget_id);
+						self.persistent_state.hovered_widget.set(Some(widget_id));
 					}
 				});
 		}
@@ -160,7 +159,7 @@ impl Ui {
 }
 
 
-impl Ui {
+impl<'ps> Ui<'ps> {
 	pub fn parent_id(&self) -> Option<WidgetId> {
 		self.stack.borrow().last().copied()
 	}
@@ -207,7 +206,7 @@ impl Ui {
 }
 
 
-impl Ui {
+impl<'ps> Ui<'ps> {
 	pub fn dummy(&self) -> WidgetRef<'_, ()> {
 		self.add_widget(())
 	}

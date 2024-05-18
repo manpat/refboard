@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use super::{WidgetId, Ui, Layout, LayoutConstraints, LayoutConstraintMap};
 
-use std::any::{Any, TypeId};
+// use std::any::{Any, TypeId};
 use std::fmt::Debug;
 
 use std::marker::PhantomData;
@@ -14,24 +14,22 @@ pub struct ConstraintContext<'a> {
 }
 
 
-bitflags! {
-	pub struct InputBehaviour : u8 {
-		const DUMMY = 1;
-	}
-}
-
-
 pub trait Widget : AsAny + Debug {
-	fn input_behaviour(&self) -> InputBehaviour { InputBehaviour::DUMMY }
+	// type State: WidgetState;
 	fn constrain(&self, _: ConstraintContext<'_>) {}
 	fn draw(&self, _painter: &mut Painter, _layout: &Layout) {}
 }
+
+// pub trait WidgetState : AsAny + Debug {
+// 	fn constrain(&self, _: ConstraintContext<'_>) {}
+// 	fn draw(&self, _painter: &mut Painter, _layout: &Layout) {}
+// }
 
 
 #[derive(Debug, Copy, Clone)]
 pub struct WidgetRef<'ui, T> {
 	pub widget_id: WidgetId,
-	pub ui: &'ui Ui,
+	pub ui: &'ui Ui<'ui>,
 
 	pub phantom: PhantomData<&'ui T>,
 }
@@ -54,7 +52,7 @@ impl<'ui, T> WidgetRef<'ui, T> {
 	}
 
 	pub fn is_hovered(&self) -> bool {
-		self.ui.hovered_widget == Some(self.widget_id)
+		self.ui.persistent_state.hovered_widget.get() == Some(self.widget_id)
 	}
 
 	pub fn is_clicked(&self) -> bool {
