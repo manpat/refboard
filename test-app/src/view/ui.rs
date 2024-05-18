@@ -15,7 +15,7 @@ use super::Input;
 use std::any::TypeId;
 use std::marker::PhantomData;
 use std::hash::{DefaultHasher, Hasher, Hash};
-use std::cell::Cell;
+// use std::cell::Cell;
 
 
 pub struct System {
@@ -67,22 +67,18 @@ pub struct Ui {
 
 	widget_layouts: LayoutMap,
 
+	// TODO(pat.m): Set in Persistent state, not here
 	hovered_widget: Option<WidgetId>,
+
+	// TODO(pat.m): take directly from Input
 	click_happened: bool,
 }
 
 impl Ui {
 	pub fn new() -> Ui {
-		let mut widgets = WidgetContainer::default();
-		let mut hierarchy = Hierarchy::default();
-		let mut stack = Vec::new();
-
-		let root_widget = BoxLayout{ axis: Axis::Horizontal };
-
-		let root_id = WidgetId(0);
-		widgets.insert(root_id, Box::new(root_widget));
-		stack.push(root_id);
-		hierarchy.add(root_id, None);
+		let widgets = WidgetContainer::default();
+		let hierarchy = Hierarchy::default();
+		let stack = Vec::new();
 
 		Ui {
 			widgets: widgets.into(),
@@ -165,9 +161,8 @@ impl Ui {
 
 
 impl Ui {
-	pub fn parent_id(&self) -> WidgetId {
+	pub fn parent_id(&self) -> Option<WidgetId> {
 		self.stack.borrow().last().copied()
-			.expect("Stack empty")
 	}
 
 	pub fn add_widget<T>(&self, widget: T) -> WidgetRef<'_, T>

@@ -115,10 +115,8 @@ impl Input {
 	}
 
 	pub fn process_events(&mut self, viewport: &Viewport) {
-		if let Some(raw_pos) = self.raw_cursor_pos {
-			let view_pos = viewport.physical_to_view() * raw_pos;
-			self.cursor_pos_view = Some(view_pos);
-		}
+		self.cursor_pos_view = self.raw_cursor_pos
+			.map(|raw_pos| viewport.physical_to_view() * raw_pos);
 	}
 
 	pub fn send_event(&mut self, event: WindowEvent) {
