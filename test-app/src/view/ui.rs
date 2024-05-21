@@ -58,9 +58,9 @@ pub struct WidgetId(u64);
 
 #[derive(Debug)]
 pub struct Ui<'ps> {
-	// TODO(pat.m): most of this shouldn't be slotmaps - we never remove widgets within a frame so their index is stable
 	widgets: RefCell<WidgetContainer>,
 	hierarchy: RefCell<Hierarchy>,
+
 	stack: RefCell<Vec<WidgetId>>,
 	layout_constraints: RefCell<LayoutConstraintMap>,
 
@@ -170,10 +170,11 @@ impl<'ps> Ui<'ps> {
 		self.add_widget_to(widget, self.parent_id())
 	}
 
-	pub fn add_widget_to<T>(&self, widget: T, parent_id: impl Into<Option<WidgetId>>) -> WidgetRef<'_, T>
+	pub fn add_widget_to<T>(&self, mut widget: T, parent_id: impl Into<Option<WidgetId>>) -> WidgetRef<'_, T>
 		where T: Widget + 'static
 	{
 		let mut hierarchy = self.hierarchy.borrow_mut();
+		let mut widgets = self.widgets.borrow_mut();
 
 		let parent_id = parent_id.into();
 		let type_id = TypeId::of::<T>();
@@ -185,8 +186,12 @@ impl<'ps> Ui<'ps> {
 		hasher.write_usize(widget_number);
 		let widget_id = WidgetId(hasher.finish());
 
-		self.widgets.borrow_mut().insert(widget_id, Box::new(widget));
+		// TODO(pat.m): add or update. should return status of widget and
+		// remember which widgets were not added
 		hierarchy.add(widget_id, parent_id);
+
+		widget.lifetime(WidgetLifetimeEvent::Created);
+		widgets.insert(widget_id, Box::new(widget));
 
 		WidgetRef { widget_id, ui: self, phantom: PhantomData }
 	}

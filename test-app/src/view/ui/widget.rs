@@ -13,11 +13,22 @@ pub struct ConstraintContext<'a> {
 	pub constraint_map: &'a LayoutConstraintMap,
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum WidgetLifetimeEvent {
+	Created,
+	Updated,
+	Destroyed,
+}
 
 pub trait Widget : AsAny + Debug {
 	// type State: WidgetState;
 	fn constrain(&self, _: ConstraintContext<'_>) {}
 	fn draw(&self, _painter: &mut Painter, _layout: &Layout) {}
+
+	fn lifetime(&mut self, _event: WidgetLifetimeEvent) {
+		// let type_name = self.as_any_mut().type_id();
+		println!("widget lifetime: '{self:?}' -> {_event:?}");
+	}
 }
 
 // pub trait WidgetState : AsAny + Debug {

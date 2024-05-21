@@ -12,6 +12,7 @@ pub struct Hierarchy {
 pub struct HierarchyNode {
 	pub parent: Option<WidgetId>,
 	pub children: Vec<WidgetId>,
+	pub fresh: bool,
 }
 
 impl Hierarchy {
@@ -24,7 +25,7 @@ impl Hierarchy {
 			self.root_nodes.push(widget_id);
 		}
 
-		let prev_value = self.info.insert(widget_id, HierarchyNode{parent, children: Vec::new()});
+		let prev_value = self.info.insert(widget_id, HierarchyNode{parent, children: Vec::new(), fresh: false});
 		assert!(prev_value.is_none(), "Widget already added to hierarchy!");
 	}
 
