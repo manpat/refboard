@@ -1,10 +1,14 @@
 use crate::prelude::*;
 
+use std::cell::Cell;
+
 #[derive(Default)]
 pub struct App {
 	pub persistence: AppPersistence,
 	pub board: Board,
 	pub undo_stack: UndoStack,
+
+	pub dummy: Cell<u32>,
 
 	pub command_queue: Vec<AppCommand>,
 }

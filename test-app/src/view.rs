@@ -43,10 +43,12 @@ impl View {
 		self.input.process_events(&self.viewport);
 	}
 
-	pub fn paint(&mut self, painter: &mut Painter, _app: &app::App) {
+	pub fn paint(&mut self, painter: &mut Painter, app: &app::App) {
 		let view_bounds = self.viewport.view_bounds();
 
 		self.ui.run(view_bounds, painter, &self.input, |ui| {
+			ui.push_layout(ui.add_widget(ui::FrameWidget::vertical()));
+
 			let frame = ui.add_widget(ui::FrameWidget::horizontal())
 				.set_constraints(|c| c.margin.set(8.0));
 
@@ -54,6 +56,10 @@ impl View {
 				frame.widget(|frame| {
 					frame.background_color = Color::grey_a(0.5, 0.1);
 				});
+			}
+
+			if frame.is_clicked() {
+				app.dummy.set(app.dummy.get().saturating_sub(1));
 			}
 
 			let add_widget = |idx| {
@@ -67,6 +73,7 @@ impl View {
 
 				if frame.is_clicked() {
 					println!("CLICK! {idx}");
+					app.dummy.set(app.dummy.get() + 1);
 				}
 
 				frame
@@ -77,6 +84,14 @@ impl View {
 			add_widget(1).set_constraints(|c| c.set_size((50.0, 50.0)));
 			add_widget(2).set_constraints(|c| c.set_size((100.0, 50.0)));
 			add_widget(3).set_constraints(|c| c.set_size((50.0, 100.0)));
+			ui.pop_layout();
+
+			ui.push_layout(ui.add_widget(ui::FrameWidget::horizontal()));
+			for _ in 0..app.dummy.get() {
+				add_widget(5).set_constraints(|c| c.set_size((50.0, 50.0)));
+			}
+			ui.pop_layout();
+
 			ui.pop_layout();
 		});
 

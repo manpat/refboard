@@ -65,6 +65,11 @@ impl Hierarchy {
 				true
 			}
 		});
+
+		// Remove all stale node children
+		for (_, node) in self.nodes.iter_mut() {
+			node.children.drain(node.current_epoch_child_counter..);
+		}
 	}
 
 	pub fn add_or_update(&mut self, id_fragment: impl Into<WidgetIdFragment>, parent_id: impl Into<Option<WidgetId>>) -> NodeUpdateResult {

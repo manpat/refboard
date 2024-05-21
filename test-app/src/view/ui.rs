@@ -39,13 +39,12 @@ impl System {
 
 		build_ui(&ui);
 
-		let mut widgets = ui.widgets.borrow_mut();
+		let mut widgets = ui.persistent_state.widgets.borrow_mut();
 		ui.persistent_state.hierarchy.borrow_mut()
 			.collect_stale_nodes(move |widget_id| {
 				println!("Remove {widget_id:?}!");
 
-				// TODO(pat.m):  this should become unconditional
-				if let Some(widget) = widgets.get_mut(&widget_id) {
+				if let Some(mut widget) = widgets.remove(&widget_id) {
 					widget.lifecycle(WidgetLifecycleEvent::Destroyed);
 				}
 			});
@@ -58,11 +57,11 @@ impl System {
 
 #[derive(Debug, Default)]
 pub struct PersistentState {
-	hovered_widget: Cell<Option<WidgetId>>,
+	widgets: RefCell<HashMap<WidgetId, Box<dyn Widget>>>,
 	hierarchy: RefCell<Hierarchy>,
-}
 
-type WidgetContainer = HashMap<WidgetId, Box<dyn Widget>>;
+	hovered_widget: Cell<Option<WidgetId>>,
+}
 
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
@@ -72,8 +71,6 @@ pub struct WidgetId(u64);
 
 #[derive(Debug)]
 pub struct Ui<'ps> {
-	widgets: RefCell<WidgetContainer>,
-
 	stack: RefCell<Vec<WidgetId>>,
 	layout_constraints: RefCell<LayoutConstraintMap>,
 
@@ -87,12 +84,8 @@ pub struct Ui<'ps> {
 
 impl<'ps> Ui<'ps> {
 	pub fn new(persistent_state: &'ps PersistentState) -> Ui<'ps> {
-		let widgets = WidgetContainer::default();
-		let stack = Vec::new();
-
 		Ui {
-			widgets: widgets.into(),
-			stack: stack.into(),
+			stack: Default::default(),
 			layout_constraints: LayoutConstraintMap::default().into(),
 
 			widget_layouts: LayoutMap::new(),
@@ -104,7 +97,7 @@ impl<'ps> Ui<'ps> {
 	}
 
 	pub fn layout(&mut self, available_bounds: Aabb2) {
-		let num_widgets = self.widgets.borrow().len();
+		let num_widgets = self.persistent_state.widgets.borrow().len();
 
 		let hierarchy = self.persistent_state.hierarchy.borrow();
 
@@ -116,7 +109,7 @@ impl<'ps> Ui<'ps> {
 			let mut constraints = layout_constraints.get(&widget_id).cloned().unwrap_or_default();
 			let children = hierarchy.children(widget_id);
 
-			self.widgets.borrow_mut().get_mut(&widget_id).unwrap().constrain(ConstraintContext {
+			self.persistent_state.widgets.borrow_mut().get_mut(&widget_id).unwrap().constrain(ConstraintContext {
 				constraints: &mut constraints,
 				children,
 				constraint_map: &mut layout_constraints,
@@ -164,7 +157,7 @@ impl<'ps> Ui<'ps> {
 		self.persistent_state.hierarchy.borrow()
 			.visit_breadth_first(None, |widget_id, _| {
 				let layout = &self.widget_layouts[&widget_id];
-				self.widgets.borrow_mut().get_mut(&widget_id).unwrap().draw(painter, layout);
+				self.persistent_state.widgets.borrow_mut().get_mut(&widget_id).unwrap().draw(painter, layout);
 			});
 	}
 }
@@ -185,7 +178,7 @@ impl Ui<'_> {
 		where T: Widget + 'static
 	{
 		let mut hierarchy = self.persistent_state.hierarchy.borrow_mut();
-		let mut widgets = self.widgets.borrow_mut();
+		let mut widgets = self.persistent_state.widgets.borrow_mut();
 
 		let parent_id = parent_id.into();
 		let type_id = TypeId::of::<T>();

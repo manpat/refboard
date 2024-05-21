@@ -25,7 +25,9 @@ pub trait Widget : AsAny + Debug {
 
 	fn lifecycle(&mut self, _event: WidgetLifecycleEvent) {
 		// let type_name = self.as_any_mut().type_id();
-		println!("widget lifecycle: '{self:?}' -> {_event:?}");
+		if _event != WidgetLifecycleEvent::Updated {
+			println!("widget lifecycle {_event:?}: '{self:?}'");
+		}
 	}
 }
 
@@ -53,7 +55,7 @@ impl<'ui, T> WidgetRef<'ui, T> {
 	pub fn widget<R>(&self, mutate: impl FnOnce(&mut T) -> R) -> Option<R>
 		where T: Widget
 	{
-		let mut widgets = self.ui.widgets.borrow_mut();
+		let mut widgets = self.ui.persistent_state.widgets.borrow_mut();
 		let widget: &mut dyn Widget = &mut **widgets.get_mut(&self.widget_id).unwrap();
 
 		widget.as_any_mut().downcast_mut::<T>()
