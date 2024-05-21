@@ -159,7 +159,7 @@ impl<'ps> Ui<'ps> {
 }
 
 
-impl<'ps> Ui<'ps> {
+impl Ui<'_> {
 	pub fn parent_id(&self) -> Option<WidgetId> {
 		self.stack.borrow().last().copied()
 	}
@@ -178,6 +178,8 @@ impl<'ps> Ui<'ps> {
 
 		let parent_id = parent_id.into();
 		let type_id = TypeId::of::<T>();
+
+		// TODO(pat.m): make this overrideable
 		let widget_number = hierarchy.children(parent_id).len();
 
 		let mut hasher = DefaultHasher::new();
@@ -211,7 +213,7 @@ impl<'ps> Ui<'ps> {
 }
 
 
-impl<'ps> Ui<'ps> {
+impl Ui<'_> {
 	pub fn dummy(&self) -> WidgetRef<'_, ()> {
 		self.add_widget(())
 	}

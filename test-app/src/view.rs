@@ -47,7 +47,8 @@ impl View {
 		let view_bounds = self.viewport.view_bounds();
 
 		self.ui.run(view_bounds, painter, &self.input, |ui| {
-			let frame = ui.add_widget(ui::FrameWidget::horizontal());
+			let frame = ui.add_widget(ui::FrameWidget::horizontal())
+				.set_constraints(|c| c.margin.set(8.0));
 
 			if frame.is_hovered() {
 				frame.widget(|frame| {
@@ -83,7 +84,6 @@ impl View {
 		if let Some(cursor_pos) = self.input.cursor_pos_view {
 			painter.circle(cursor_pos, 3.0, [1.0, 0.0, 0.0]);
 		}
-
 	}
 
 	pub fn should_redraw(&self) -> bool {
