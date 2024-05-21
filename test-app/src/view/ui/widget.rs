@@ -24,14 +24,14 @@ pub trait Widget : AsAny + Debug {
 	fn draw(&self, _painter: &mut Painter, _layout: &Layout) {}
 
 	fn lifecycle(&mut self, _event: WidgetLifecycleEvent) {
-		// let type_name = self.as_any_mut().type_id();
 		if _event != WidgetLifecycleEvent::Updated {
-			println!("widget lifecycle {_event:?}: '{self:?}'");
+			let type_name = (*self).type_name();
+			println!("widget lifecycle {_event:?}: '{type_name}'");
 		}
 	}
 }
 
-// pub trait WidgetState : AsAny + Debug {
+// pub trait WidgetState : AsAny + Debug + 'static {
 // 	fn constrain(&self, _: ConstraintContext<'_>) {}
 // 	fn draw(&self, _painter: &mut Painter, _layout: &Layout) {}
 // }

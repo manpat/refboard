@@ -1,12 +1,11 @@
 
 
-use std::any::Any;
+use std::any::{Any, type_name};
 
 
 pub trait AsAny : Any {
 	fn as_any(&self) -> &dyn Any;
 	fn as_any_mut(&mut self) -> &mut dyn Any;
-	// fn type_name(&self) -> &'static str;
 }
 
 impl<T> AsAny for T
@@ -14,7 +13,18 @@ impl<T> AsAny for T
 {
 	fn as_any(&self) -> &dyn Any { self }
 	fn as_any_mut(&mut self) -> &mut dyn Any { self }
-	// fn type_name(&'_ self) -> &'static str {
-	// 	Any::type_name(self)
-	// }
+}
+
+
+// Separate from the above as Any has a 'static bound which makes things weird?
+pub trait HasTypeName {
+    fn type_name(&self) -> &'static str;
+}
+
+impl<T> HasTypeName for T
+	where T: ?Sized
+{
+	fn type_name(&self) -> &'static str {
+		type_name::<T>()
+	}
 }
