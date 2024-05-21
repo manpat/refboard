@@ -12,7 +12,7 @@ pub struct ConstraintContext<'a> {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum WidgetLifetimeEvent {
+pub enum WidgetLifecycleEvent {
 	Created,
 	Updated,
 	Destroyed,
@@ -23,9 +23,9 @@ pub trait Widget : AsAny + Debug {
 	fn constrain(&self, _: ConstraintContext<'_>) {}
 	fn draw(&self, _painter: &mut Painter, _layout: &Layout) {}
 
-	fn lifetime(&mut self, _event: WidgetLifetimeEvent) {
+	fn lifecycle(&mut self, _event: WidgetLifecycleEvent) {
 		// let type_name = self.as_any_mut().type_id();
-		println!("widget lifetime: '{self:?}' -> {_event:?}");
+		println!("widget lifecycle: '{self:?}' -> {_event:?}");
 	}
 }
 

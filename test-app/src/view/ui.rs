@@ -14,7 +14,7 @@ use super::Input;
 
 use std::any::TypeId;
 use std::marker::PhantomData;
-use std::hash::{DefaultHasher, Hasher, Hash};
+// use std::hash::{DefaultHasher, Hasher, Hash};
 
 
 pub struct System {
@@ -30,12 +30,25 @@ impl System {
 
 	// TODO(pat.m): could this be built around the same mechanism as std::thread::scope?
 	pub fn run(&mut self, bounds: Aabb2, painter: &mut Painter, input: &Input, build_ui: impl FnOnce(&Ui<'_>)) {
+		self.persistent_state.hierarchy.get_mut().new_epoch();
+
 		let mut ui = Ui::new(&self.persistent_state);
 		ui.click_happened = input.click_received;
 
 		// TODO(pat.m): handle input first, using cached input handlers from previous frame
 
 		build_ui(&ui);
+
+		let mut widgets = ui.widgets.borrow_mut();
+		ui.persistent_state.hierarchy.borrow_mut()
+			.collect_stale_nodes(move |widget_id| {
+				println!("Remove {widget_id:?}!");
+
+				// TODO(pat.m):  this should become unconditional
+				if let Some(widget) = widgets.get_mut(&widget_id) {
+					widget.lifecycle(WidgetLifecycleEvent::Destroyed);
+				}
+			});
 
 		ui.layout(bounds);
 		ui.handle_input(input);
@@ -46,6 +59,7 @@ impl System {
 #[derive(Debug, Default)]
 pub struct PersistentState {
 	hovered_widget: Cell<Option<WidgetId>>,
+	hierarchy: RefCell<Hierarchy>,
 }
 
 type WidgetContainer = HashMap<WidgetId, Box<dyn Widget>>;
@@ -59,7 +73,6 @@ pub struct WidgetId(u64);
 #[derive(Debug)]
 pub struct Ui<'ps> {
 	widgets: RefCell<WidgetContainer>,
-	hierarchy: RefCell<Hierarchy>,
 
 	stack: RefCell<Vec<WidgetId>>,
 	layout_constraints: RefCell<LayoutConstraintMap>,
@@ -75,12 +88,10 @@ pub struct Ui<'ps> {
 impl<'ps> Ui<'ps> {
 	pub fn new(persistent_state: &'ps PersistentState) -> Ui<'ps> {
 		let widgets = WidgetContainer::default();
-		let hierarchy = Hierarchy::default();
 		let stack = Vec::new();
 
 		Ui {
 			widgets: widgets.into(),
-			hierarchy: hierarchy.into(),
 			stack: stack.into(),
 			layout_constraints: LayoutConstraintMap::default().into(),
 
@@ -95,7 +106,7 @@ impl<'ps> Ui<'ps> {
 	pub fn layout(&mut self, available_bounds: Aabb2) {
 		let num_widgets = self.widgets.borrow().len();
 
-		let hierarchy = self.hierarchy.borrow();
+		let hierarchy = self.persistent_state.hierarchy.borrow();
 
 		let mut layout_constraints = self.layout_constraints.borrow_mut();
 		layout_constraints.reserve(num_widgets);
@@ -117,7 +128,7 @@ impl<'ps> Ui<'ps> {
 		self.widget_layouts.clear();
 		self.widget_layouts.reserve(num_widgets);
 
-		for &widget_id in hierarchy.root_nodes.iter() {
+		for &widget_id in hierarchy.root_node.children.iter() {
 			layout_children_linear(available_bounds, Axis::Horizontal, Align::Start, &[widget_id], &layout_constraints, &mut self.widget_layouts);
 		}
 
@@ -138,7 +149,7 @@ impl<'ps> Ui<'ps> {
 		self.persistent_state.hovered_widget.set(None);
 
 		if let Some(cursor_pos) = input.cursor_pos_view {
-			self.hierarchy.borrow()
+			self.persistent_state.hierarchy.borrow()
 				.visit_breadth_first(None, |widget_id, _| {
 					let box_bounds = self.widget_layouts[&widget_id].box_bounds;
 					if box_bounds.contains_point(cursor_pos) {
@@ -150,7 +161,7 @@ impl<'ps> Ui<'ps> {
 
 	pub fn draw(&mut self, painter: &mut Painter) {
 		// draw from root to leaves
-		self.hierarchy.borrow()
+		self.persistent_state.hierarchy.borrow()
 			.visit_breadth_first(None, |widget_id, _| {
 				let layout = &self.widget_layouts[&widget_id];
 				self.widgets.borrow_mut().get_mut(&widget_id).unwrap().draw(painter, layout);
@@ -173,26 +184,22 @@ impl Ui<'_> {
 	pub fn add_widget_to<T>(&self, mut widget: T, parent_id: impl Into<Option<WidgetId>>) -> WidgetRef<'_, T>
 		where T: Widget + 'static
 	{
-		let mut hierarchy = self.hierarchy.borrow_mut();
+		let mut hierarchy = self.persistent_state.hierarchy.borrow_mut();
 		let mut widgets = self.widgets.borrow_mut();
 
 		let parent_id = parent_id.into();
 		let type_id = TypeId::of::<T>();
 
-		// TODO(pat.m): make this overrideable
-		let widget_number = hierarchy.children(parent_id).len();
+		// TODO(pat.m): make id fragment overrideable
+		let NodeUpdateResult {
+			widget_id,
+			status,
+		} = hierarchy.add_or_update(WidgetIdFragment::TypedOrdered(type_id), parent_id);
 
-		let mut hasher = DefaultHasher::new();
-		parent_id.hash(&mut hasher);
-		type_id.hash(&mut hasher);
-		hasher.write_usize(widget_number);
-		let widget_id = WidgetId(hasher.finish());
-
-		// TODO(pat.m): add or update. should return status of widget and
-		// remember which widgets were not added
-		hierarchy.add(widget_id, parent_id);
-
-		widget.lifetime(WidgetLifetimeEvent::Created);
+		widget.lifecycle(match status {
+			NodeUpdateStatus::Added => WidgetLifecycleEvent::Created,
+			NodeUpdateStatus::Update => WidgetLifecycleEvent::Updated,
+		});
 		widgets.insert(widget_id, Box::new(widget));
 
 		WidgetRef { widget_id, ui: self, phantom: PhantomData }
