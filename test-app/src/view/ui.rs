@@ -175,7 +175,7 @@ impl Ui<'_> {
 	}
 
 	pub fn add_widget_to<T>(&self, mut widget: T, parent_id: impl Into<Option<WidgetId>>) -> WidgetRef<'_, T>
-		where T: Widget + 'static
+		where T: Widget
 	{
 		let mut hierarchy = self.persistent_state.hierarchy.borrow_mut();
 		let mut widgets = self.persistent_state.widgets.borrow_mut();
@@ -189,11 +189,21 @@ impl Ui<'_> {
 			status,
 		} = hierarchy.add_or_update(WidgetIdFragment::TypedOrdered(type_id), parent_id);
 
-		widget.lifecycle(match status {
-			NodeUpdateStatus::Added => WidgetLifecycleEvent::Created,
-			NodeUpdateStatus::Update => WidgetLifecycleEvent::Updated,
-		});
-		widgets.insert(widget_id, Box::new(widget));
+		match status {
+			NodeUpdateStatus::Added => {
+				let mut widget_state = Box::new(widget);
+				widget_state.as_mut().lifecycle(WidgetLifecycleEvent::Created);
+				widgets.insert(widget_id, widget_state);
+			}
+
+			NodeUpdateStatus::Update => {
+				let widget_state = widgets.get_mut(&widget_id).unwrap();
+				// TODO(pat.m): this sucks - update should be called with persistent state on new widget
+				widget_state.as_mut().lifecycle(WidgetLifecycleEvent::Updated);
+				// widget_state.as_mut().update(&mut widget);
+				widgets.insert(widget_id, Box::new(widget));
+			}
+		}
 
 		WidgetRef { widget_id, ui: self, phantom: PhantomData }
 	}

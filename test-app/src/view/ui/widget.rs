@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use super::{WidgetId, Ui, Layout, LayoutConstraints, LayoutConstraintMap};
 
+use std::any::Any;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
@@ -29,12 +30,10 @@ pub trait Widget : AsAny + Debug {
 			println!("widget lifecycle {_event:?}: '{type_name}'");
 		}
 	}
-}
 
-// pub trait WidgetState : AsAny + Debug + 'static {
-// 	fn constrain(&self, _: ConstraintContext<'_>) {}
-// 	fn draw(&self, _painter: &mut Painter, _layout: &Layout) {}
-// }
+	// TODO(pat.m): ????
+	fn update(&mut self, _other: &mut dyn Any) {}
+}
 
 
 #[derive(Debug, Copy, Clone)]
