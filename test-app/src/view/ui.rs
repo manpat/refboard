@@ -39,15 +39,7 @@ impl System {
 
 		build_ui(&ui);
 
-		let mut widgets = ui.persistent_state.widgets.borrow_mut();
-		ui.persistent_state.hierarchy.borrow_mut()
-			.collect_stale_nodes(move |widget_id| {
-				println!("Remove {widget_id:?}!");
-
-				if let Some(mut widget_state) = widgets.remove(&widget_id) {
-					widget_state.widget.lifecycle(WidgetLifecycleEvent::Destroyed, &mut widget_state.state);
-				}
-			});
+		self.garbage_collect();
 
 		ui.layout(bounds);
 		ui.handle_input(input);
@@ -67,6 +59,16 @@ impl System {
 					}
 				});
 		}
+	}
+
+	fn garbage_collect(&self) {
+		let mut widgets = self.persistent_state.widgets.borrow_mut();
+		self.persistent_state.hierarchy.borrow_mut()
+			.collect_stale_nodes(move |widget_id| {
+				if let Some(mut widget_state) = widgets.remove(&widget_id) {
+					widget_state.widget.lifecycle(WidgetLifecycleEvent::Destroyed, &mut widget_state.state);
+				}
+			});
 	}
 }
 
@@ -88,7 +90,7 @@ impl StateBox {
 		self.0 = Some(Box::new(value));
 	}
 
-	pub fn get_or_default<T>(&mut self) -> &mut T
+	pub fn get<T>(&mut self) -> &mut T
 		where T: Default + 'static
 	{
 		// If we have a value but the type is wrong, reset it to default
@@ -264,14 +266,23 @@ impl Ui<'_> {
 					state: StateBox(None),
 				};
 
-				widget_box.widget.as_mut().lifecycle(WidgetLifecycleEvent::Created, &mut widget_box.state);
+				widget_box.widget.lifecycle(WidgetLifecycleEvent::Created, &mut widget_box.state);
 				widgets.insert(widget_id, widget_box);
 			}
 
 			NodeUpdateStatus::Update => {
 				let widget_state = widgets.get_mut(&widget_id).unwrap();
-				widget_state.widget = Box::new(widget);
-				widget_state.widget.as_mut().lifecycle(WidgetLifecycleEvent::Updated, &mut widget_state.state);
+
+				// Reuse allocation if we can
+				if let Some(typed_widget) = widget_state.widget.as_widget_mut::<T>() {
+					*typed_widget = widget;
+				} else {
+					// Otherwise recreate storage
+					widget_state.widget = Box::new(widget);
+					// TODO(pat.m): should this still be an update event?
+				}
+
+				widget_state.widget.lifecycle(WidgetLifecycleEvent::Updated, &mut widget_state.state);
 			}
 		}
 

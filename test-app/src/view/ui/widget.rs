@@ -21,7 +21,6 @@ pub enum WidgetLifecycleEvent {
 }
 
 pub trait Widget : AsAny + Debug {
-	// type State: WidgetState;
 	fn constrain(&self, _: ConstraintContext<'_>) {}
 	fn draw(&self, _painter: &mut Painter, _layout: &Layout, _: &mut StateBox) {}
 
@@ -30,6 +29,22 @@ pub trait Widget : AsAny + Debug {
 			let type_name = (*self).type_name();
 			println!("widget lifecycle {_event:?}: '{type_name}' ------ {_state:?}");
 		}
+	}
+}
+
+impl dyn Widget {
+	pub fn is_widget<T: Widget>(&self) -> bool {
+		(*self).as_any().is::<T>()
+	}
+
+	pub fn as_widget<T: Widget>(&self) -> Option<&T> {
+		(*self).as_any()
+			.downcast_ref::<T>()
+	}
+
+	pub fn as_widget_mut<T: Widget>(&mut self) -> Option<&mut T> {
+		(*self).as_any_mut()
+			.downcast_mut::<T>()
 	}
 }
 
@@ -54,9 +69,8 @@ impl<'ui, T> WidgetRef<'ui, T> {
 	{
 		let mut widgets = self.ui.persistent_state.widgets.borrow_mut();
 		let widget_state = widgets.get_mut(&self.widget_id)?;
-		let widget: &mut dyn Widget = &mut *widget_state.widget;
 
-		widget.as_any_mut().downcast_mut::<T>()
+		widget_state.widget.as_widget_mut()
 			.map(|widget| mutate(widget, &mut widget_state.state))
 	}
 
