@@ -53,20 +53,21 @@ impl View {
 				.set_constraints(|c| c.margin.set(8.0));
 
 			if frame.is_hovered() {
-				frame.widget(|frame| {
+				frame.widget(|frame, _| {
 					frame.background_color = Color::grey_a(0.5, 0.1);
 				});
 			}
 
 			if frame.is_clicked() {
 				app.dummy.set(app.dummy.get().saturating_sub(1));
+				app.hack_changed.set(true);
 			}
 
 			let add_widget = |idx| {
 				let frame = ui.add_widget(ui::FrameWidget::horizontal().with_color(Color::green().with_alpha(0.2)));
 
 				if frame.is_hovered() {
-					frame.widget(|frame| {
+					frame.widget(|frame, _| {
 						frame.background_color = Color::green();
 					});
 				}
@@ -74,22 +75,23 @@ impl View {
 				if frame.is_clicked() {
 					println!("CLICK! {idx}");
 					app.dummy.set(app.dummy.get() + 1);
+					app.hack_changed.set(true);
 				}
 
 				frame
 			};
+
+			ui.push_layout(ui.add_widget(ui::FrameWidget::horizontal()));
+			for _ in 0..app.dummy.get() {
+				add_widget(5).set_constraints(|c| c.set_size((50.0, 50.0)));
+			}
+			ui.pop_layout();
 
 			ui.push_layout(frame);
 			add_widget(0).set_constraints(|c| c.set_size((20.0, 20.0)));
 			add_widget(1).set_constraints(|c| c.set_size((50.0, 50.0)));
 			add_widget(2).set_constraints(|c| c.set_size((100.0, 50.0)));
 			add_widget(3).set_constraints(|c| c.set_size((50.0, 100.0)));
-			ui.pop_layout();
-
-			ui.push_layout(ui.add_widget(ui::FrameWidget::horizontal()));
-			for _ in 0..app.dummy.get() {
-				add_widget(5).set_constraints(|c| c.set_size((50.0, 50.0)));
-			}
 			ui.pop_layout();
 
 			ui.pop_layout();

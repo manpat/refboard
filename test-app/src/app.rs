@@ -9,6 +9,7 @@ pub struct App {
 	pub undo_stack: UndoStack,
 
 	pub dummy: Cell<u32>,
+	pub hack_changed: Cell<bool>,
 
 	pub command_queue: Vec<AppCommand>,
 }

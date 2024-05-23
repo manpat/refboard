@@ -1,7 +1,6 @@
 use crate::prelude::*;
-use super::{WidgetId, Ui, Layout, LayoutConstraints, LayoutConstraintMap};
+use super::{WidgetId, Ui, StateBox, Layout, LayoutConstraints, LayoutConstraintMap};
 
-use std::any::Any;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
@@ -10,6 +9,8 @@ pub struct ConstraintContext<'a> {
 	pub constraints: &'a mut LayoutConstraints,
 	pub children: &'a [WidgetId],
 	pub constraint_map: &'a LayoutConstraintMap,
+
+	pub state: &'a mut StateBox,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -22,17 +23,14 @@ pub enum WidgetLifecycleEvent {
 pub trait Widget : AsAny + Debug {
 	// type State: WidgetState;
 	fn constrain(&self, _: ConstraintContext<'_>) {}
-	fn draw(&self, _painter: &mut Painter, _layout: &Layout) {}
+	fn draw(&self, _painter: &mut Painter, _layout: &Layout, _: &mut StateBox) {}
 
-	fn lifecycle(&mut self, _event: WidgetLifecycleEvent) {
+	fn lifecycle(&mut self, _event: WidgetLifecycleEvent, _state: &mut StateBox) {
 		if _event != WidgetLifecycleEvent::Updated {
 			let type_name = (*self).type_name();
-			println!("widget lifecycle {_event:?}: '{type_name}'");
+			println!("widget lifecycle {_event:?}: '{type_name}' ------ {_state:?}");
 		}
 	}
-
-	// TODO(pat.m): ????
-	fn update(&mut self, _other: &mut dyn Any) {}
 }
 
 
@@ -51,14 +49,15 @@ impl<'ui, T> WidgetRef<'ui, T> {
 		self
 	}
 
-	pub fn widget<R>(&self, mutate: impl FnOnce(&mut T) -> R) -> Option<R>
+	pub fn widget<R>(&self, mutate: impl FnOnce(&mut T, &mut StateBox) -> R) -> Option<R>
 		where T: Widget
 	{
 		let mut widgets = self.ui.persistent_state.widgets.borrow_mut();
-		let widget: &mut dyn Widget = &mut **widgets.get_mut(&self.widget_id).unwrap();
+		let widget_state = widgets.get_mut(&self.widget_id)?;
+		let widget: &mut dyn Widget = &mut *widget_state.widget;
 
 		widget.as_any_mut().downcast_mut::<T>()
-			.map(mutate)
+			.map(|widget| mutate(widget, &mut widget_state.state))
 	}
 
 	pub fn is_hovered(&self) -> bool {

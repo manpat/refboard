@@ -144,7 +144,8 @@ async fn main() -> anyhow::Result<()> {
 			}
 
 			Event::AboutToWait => {
-				if view.should_redraw() {
+				if view.should_redraw() || app.hack_changed.get() {
+					app.hack_changed.set(false);
 					window.request_redraw();
 				}
 

@@ -12,7 +12,7 @@ pub use hierarchy::*;
 
 use super::Input;
 
-use std::any::TypeId;
+use std::any::{TypeId, Any};
 use std::marker::PhantomData;
 // use std::hash::{DefaultHasher, Hasher, Hash};
 
@@ -32,10 +32,10 @@ impl System {
 	pub fn run(&mut self, bounds: Aabb2, painter: &mut Painter, input: &Input, build_ui: impl FnOnce(&Ui<'_>)) {
 		self.persistent_state.hierarchy.get_mut().new_epoch();
 
+		self.process_input(input);
+
 		let mut ui = Ui::new(&self.persistent_state);
 		ui.click_happened = input.click_received;
-
-		// TODO(pat.m): handle input first, using cached input handlers from previous frame
 
 		build_ui(&ui);
 
@@ -44,8 +44,8 @@ impl System {
 			.collect_stale_nodes(move |widget_id| {
 				println!("Remove {widget_id:?}!");
 
-				if let Some(mut widget) = widgets.remove(&widget_id) {
-					widget.lifecycle(WidgetLifecycleEvent::Destroyed);
+				if let Some(mut widget_state) = widgets.remove(&widget_id) {
+					widget_state.widget.lifecycle(WidgetLifecycleEvent::Destroyed, &mut widget_state.state);
 				}
 			});
 
@@ -53,11 +53,73 @@ impl System {
 		ui.handle_input(input);
 		ui.draw(painter);
 	}
+
+	fn process_input(&mut self, input: &Input) {
+		self.persistent_state.hovered_widget.set(None);
+
+		if let Some(cursor_pos) = input.cursor_pos_view {
+			let input_handlers = self.persistent_state.input_handlers.borrow();
+
+			self.persistent_state.hierarchy.borrow()
+				.visit_breadth_first(None, |widget_id, _| {
+					if input_handlers[&widget_id].contains_point(cursor_pos) {
+						self.persistent_state.hovered_widget.set(Some(widget_id));
+					}
+				});
+		}
+	}
 }
+
+
+#[derive(Debug, Default)]
+pub struct StateBox(Option<Box<dyn Any>>);
+
+impl StateBox {
+	pub fn has<T: 'static>(&self) -> bool {
+		match &self.0 {
+			Some(value) => (*value).is::<T>(),
+			None => false,
+		}
+	}
+
+	pub fn set<T>(&mut self, value: T)
+		where T: 'static
+	{
+		self.0 = Some(Box::new(value));
+	}
+
+	pub fn get_or_default<T>(&mut self) -> &mut T
+		where T: Default + 'static
+	{
+		// If we have a value but the type is wrong, reset it to default
+		if !self.has::<T>() {
+			self.set(T::default());
+		}
+
+		// SAFETY: We're calling set above, so we know that the Option is populated and with what type.
+		unsafe {
+			// TODO(pat.m): this could use downcast_mut_unchecked once stable
+			self.0.as_mut()
+				.unwrap_unchecked()
+				.downcast_mut::<T>()
+				.unwrap_unchecked()
+		}
+	}
+}
+
+
+#[derive(Debug)]
+struct WidgetBox {
+	// TODO(pat.m): we don't actually really need this across frames
+	widget: Box<dyn Widget>,
+	state: StateBox,
+}
+
 
 #[derive(Debug, Default)]
 pub struct PersistentState {
-	widgets: RefCell<HashMap<WidgetId, Box<dyn Widget>>>,
+	widgets: RefCell<HashMap<WidgetId, WidgetBox>>,
+	input_handlers: RefCell<HashMap<WidgetId, Aabb2>>,
 	hierarchy: RefCell<Hierarchy>,
 
 	hovered_widget: Cell<Option<WidgetId>>,
@@ -97,11 +159,11 @@ impl<'ps> Ui<'ps> {
 	}
 
 	pub fn layout(&mut self, available_bounds: Aabb2) {
-		let num_widgets = self.persistent_state.widgets.borrow().len();
-
 		let hierarchy = self.persistent_state.hierarchy.borrow();
-
+		let mut widgets = self.persistent_state.widgets.borrow_mut();
 		let mut layout_constraints = self.layout_constraints.borrow_mut();
+
+		let num_widgets = widgets.len();
 		layout_constraints.reserve(num_widgets);
 
 		// bottom up request size hints/policies and content sizes if appropriate
@@ -109,10 +171,13 @@ impl<'ps> Ui<'ps> {
 			let mut constraints = layout_constraints.get(&widget_id).cloned().unwrap_or_default();
 			let children = hierarchy.children(widget_id);
 
-			self.persistent_state.widgets.borrow_mut().get_mut(&widget_id).unwrap().constrain(ConstraintContext {
+			let widget_state = widgets.get_mut(&widget_id).unwrap();
+			widget_state.widget.constrain(ConstraintContext {
 				constraints: &mut constraints,
 				children,
 				constraint_map: &mut layout_constraints,
+
+				state: &mut widget_state.state,
 			});
 
 			layout_constraints.insert(widget_id, constraints);
@@ -138,26 +203,29 @@ impl<'ps> Ui<'ps> {
 		});
 	}
 
-	pub fn handle_input(&mut self, input: &Input) {
-		self.persistent_state.hovered_widget.set(None);
+	pub fn handle_input(&mut self, _input: &Input) {
+		// Persist widget bounds
+		let mut input_handlers = self.persistent_state.input_handlers.borrow_mut();
+		input_handlers.clear();
 
-		if let Some(cursor_pos) = input.cursor_pos_view {
-			self.persistent_state.hierarchy.borrow()
-				.visit_breadth_first(None, |widget_id, _| {
-					let box_bounds = self.widget_layouts[&widget_id].box_bounds;
-					if box_bounds.contains_point(cursor_pos) {
-						self.persistent_state.hovered_widget.set(Some(widget_id));
-					}
-				});
-		}
+		self.persistent_state.hierarchy.borrow()
+			.visit_breadth_first(None, |widget_id, _| {
+				// TODO(pat.m): clipping! also we probably want some per-widget configuration of input behaviour
+				let box_bounds = self.widget_layouts[&widget_id].box_bounds;
+				input_handlers.insert(widget_id, box_bounds);
+			});
 	}
 
 	pub fn draw(&mut self, painter: &mut Painter) {
+		let mut widgets = self.persistent_state.widgets.borrow_mut();
+
 		// draw from root to leaves
 		self.persistent_state.hierarchy.borrow()
 			.visit_breadth_first(None, |widget_id, _| {
 				let layout = &self.widget_layouts[&widget_id];
-				self.persistent_state.widgets.borrow_mut().get_mut(&widget_id).unwrap().draw(painter, layout);
+				let widget_state = widgets.get_mut(&widget_id).unwrap();
+
+				widget_state.widget.draw(painter, layout, &mut widget_state.state);
 			});
 	}
 }
@@ -174,7 +242,7 @@ impl Ui<'_> {
 		self.add_widget_to(widget, self.parent_id())
 	}
 
-	pub fn add_widget_to<T>(&self, mut widget: T, parent_id: impl Into<Option<WidgetId>>) -> WidgetRef<'_, T>
+	pub fn add_widget_to<T>(&self, widget: T, parent_id: impl Into<Option<WidgetId>>) -> WidgetRef<'_, T>
 		where T: Widget
 	{
 		let mut hierarchy = self.persistent_state.hierarchy.borrow_mut();
@@ -191,26 +259,23 @@ impl Ui<'_> {
 
 		match status {
 			NodeUpdateStatus::Added => {
-				let mut widget_state = Box::new(widget);
-				widget_state.as_mut().lifecycle(WidgetLifecycleEvent::Created);
-				widgets.insert(widget_id, widget_state);
+				let mut widget_box = WidgetBox {
+					widget: Box::new(widget),
+					state: StateBox(None),
+				};
+
+				widget_box.widget.as_mut().lifecycle(WidgetLifecycleEvent::Created, &mut widget_box.state);
+				widgets.insert(widget_id, widget_box);
 			}
 
 			NodeUpdateStatus::Update => {
 				let widget_state = widgets.get_mut(&widget_id).unwrap();
-				// TODO(pat.m): this sucks - update should be called with persistent state on new widget
-				widget_state.as_mut().lifecycle(WidgetLifecycleEvent::Updated);
-				// widget_state.as_mut().update(&mut widget);
-				widgets.insert(widget_id, Box::new(widget));
+				widget_state.widget = Box::new(widget);
+				widget_state.widget.as_mut().lifecycle(WidgetLifecycleEvent::Updated, &mut widget_state.state);
 			}
 		}
 
 		WidgetRef { widget_id, ui: self, phantom: PhantomData }
-	}
-
-	pub fn mutate_widget_constraints(&self, widget_id: impl Into<WidgetId>, mutate: impl FnOnce(&mut LayoutConstraints)) {
-		let mut lcs = self.layout_constraints.borrow_mut();
-		mutate(lcs.entry(widget_id.into()).or_default());
 	}
 
 	pub fn push_layout(&self, widget_id: impl Into<WidgetId>) {

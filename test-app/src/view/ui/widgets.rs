@@ -13,7 +13,7 @@ impl Widget for () {
 		ctx.constraints.horizontal_size_policy.set_default(SizingBehaviour::FLEXIBLE);
 	}
 
-	fn draw(&self, painter: &mut Painter, layout: &Layout) {
+	fn draw(&self, painter: &mut Painter, layout: &Layout, _: &mut StateBox) {
 		let widget_color = [0.5; 3];
 		painter.rounded_rect_outline(layout.box_bounds, 8.0, widget_color);
 		painter.line(layout.box_bounds.min, layout.box_bounds.max, widget_color);
@@ -32,7 +32,7 @@ pub struct DrawFnWidget<F>(pub F)
 impl<F> Widget for DrawFnWidget<F>
 	where F: Fn(&mut Painter, &Layout) + 'static
 {
-	fn draw(&self, painter: &mut Painter, layout: &Layout) {
+	fn draw(&self, painter: &mut Painter, layout: &Layout, _: &mut StateBox) {
 		(self.0)(painter, layout);
 	}
 }
@@ -64,7 +64,7 @@ impl BoxLayout {
 
 impl Widget for BoxLayout {
 	fn constrain(&self, ctx: ConstraintContext<'_>) {
-		let ConstraintContext { constraints, children, constraint_map } = ctx;
+		let ConstraintContext { constraints, children, constraint_map, .. } = ctx;
 
 		constraints.layout_axis.set_default(self.axis);
 
@@ -157,13 +157,13 @@ impl<W> Widget for FrameWidget<W>
 		self.inner.constrain(ctx);
 	}
 
-	fn draw(&self, painter: &mut Painter, layout: &Layout) {
+	fn draw(&self, painter: &mut Painter, layout: &Layout, state: &mut StateBox) {
 		let rounding = 4.0;
 
 		painter.rounded_rect(layout.box_bounds, rounding, self.background_color);
 		painter.rounded_rect_outline(layout.box_bounds, rounding, self.outline_color);
 
-		self.inner.draw(painter, layout);
+		self.inner.draw(painter, layout, state);
 	}
 }
 
