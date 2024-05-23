@@ -182,3 +182,25 @@ impl Widget for Spring {
 }
 
 
+
+#[derive(Debug)]
+pub struct Button;
+
+impl Widget for Button {
+	fn constrain(&self, ctx: ConstraintContext<'_>) {
+		ctx.constraints.padding.set_default(8.0);
+		ctx.constraints.margin.set_default(4.0);
+
+		ctx.constraints.min_width.set_default(72.0);
+		ctx.constraints.min_height.set_default(32.0);
+	}
+
+	fn draw(&self, painter: &mut Painter, layout: &Layout, _state: &mut StateBox) {
+		let rounding = 4.0;
+
+		painter.rounded_rect(layout.box_bounds, rounding, Color::grey(0.3));
+		painter.rounded_rect_outline(layout.box_bounds, rounding, Color::grey(0.5));
+	}
+}
+
+

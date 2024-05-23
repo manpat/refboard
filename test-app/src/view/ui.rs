@@ -308,5 +308,9 @@ impl Ui<'_> {
 		// TODO(pat.m): can I derive Axis from context?
 		self.add_widget(Spring(axis))
 	}
+
+	pub fn button(&self) -> WidgetRef<'_, Button> {
+		self.add_widget(Button)
+	}
 }
 
