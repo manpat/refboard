@@ -1,14 +1,15 @@
 use crate::prelude::*;
 use super::{WidgetId, Ui, StateBox, Layout, LayoutConstraints, LayoutConstraintMap};
 
+use std::cell::{RefMut};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
 
 pub struct ConstraintContext<'a> {
 	pub constraints: &'a mut LayoutConstraints,
-	pub children: &'a [WidgetId],
 	pub constraint_map: &'a LayoutConstraintMap,
+	pub children: &'a [WidgetId],
 
 	pub state: &'a mut StateBox,
 }
@@ -58,20 +59,44 @@ pub struct WidgetRef<'ui, T> {
 }
 
 impl<'ui, T> WidgetRef<'ui, T> {
-	pub fn set_constraints(self, mutate: impl FnOnce(&mut LayoutConstraints)) -> Self {
-		let mut lcs = self.ui.layout_constraints.borrow_mut();
-		mutate(lcs.entry(self.widget_id).or_default());
+	pub fn with_constraints(self, mutate: impl FnOnce(&mut LayoutConstraints)) -> Self {
+		mutate(&mut *self.constraints());
 		self
 	}
 
-	pub fn widget<R>(&self, mutate: impl FnOnce(&mut T, &mut StateBox) -> R) -> Option<R>
+	pub fn with_widget(self, mutate: impl FnOnce(&mut T, &mut StateBox)) -> Self
 		where T: Widget
 	{
-		let mut widgets = self.ui.persistent_state.widgets.borrow_mut();
-		let widget_state = widgets.get_mut(&self.widget_id)?;
+		let (mut widget, mut state) = self.widget_box();
+		mutate(widget.as_widget_mut().unwrap(), &mut *state);
+		self
+	}
 
-		widget_state.widget.as_widget_mut()
-			.map(|widget| mutate(widget, &mut widget_state.state))
+	pub fn widget(&self) -> RefMut<'ui, T>
+		where T: Widget
+	{
+		RefMut::map(self.widget_box().0, |w| w.as_widget_mut().unwrap())
+	}
+
+	pub fn state(&self) -> RefMut<'ui, StateBox> {
+		self.widget_box().1
+	}
+
+	pub fn constraints(&self) -> RefMut<'ui, LayoutConstraints> {
+		RefMut::map(
+			self.ui.widget_constraints.borrow_mut(),
+			|wcs| wcs.entry(self.widget_id).or_default()
+		)
+	}
+
+	fn widget_box(&self) -> (RefMut<'ui, dyn Widget>, RefMut<'ui, StateBox>) {
+		RefMut::map_split(
+			self.ui.persistent_state.widgets.borrow_mut(),
+			|widgets| {
+				let widget_box = widgets.get_mut(&self.widget_id).unwrap();
+				(&mut *widget_box.widget, &mut widget_box.state)
+			}
+		)
 	}
 
 	pub fn is_hovered(&self) -> bool {

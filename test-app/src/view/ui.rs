@@ -136,8 +136,8 @@ pub struct WidgetId(u64);
 #[derive(Debug)]
 pub struct Ui<'ps> {
 	stack: RefCell<Vec<WidgetId>>,
-	layout_constraints: RefCell<LayoutConstraintMap>,
 
+	widget_constraints: RefCell<LayoutConstraintMap>,
 	widget_layouts: LayoutMap,
 
 	// TODO(pat.m): take directly from Input
@@ -147,10 +147,10 @@ pub struct Ui<'ps> {
 }
 
 impl<'ps> Ui<'ps> {
-	pub fn new(persistent_state: &'ps PersistentState) -> Ui<'ps> {
+	fn new(persistent_state: &'ps PersistentState) -> Ui<'ps> {
 		Ui {
 			stack: Default::default(),
-			layout_constraints: LayoutConstraintMap::default().into(),
+			widget_constraints: LayoutConstraintMap::default().into(),
 
 			widget_layouts: LayoutMap::new(),
 
@@ -160,52 +160,52 @@ impl<'ps> Ui<'ps> {
 		}
 	}
 
-	pub fn layout(&mut self, available_bounds: Aabb2) {
+	fn layout(&mut self, available_bounds: Aabb2) {
 		let hierarchy = self.persistent_state.hierarchy.borrow();
 		let mut widgets = self.persistent_state.widgets.borrow_mut();
-		let mut layout_constraints = self.layout_constraints.borrow_mut();
+		let mut widget_constraints = self.widget_constraints.borrow_mut();
 
 		let num_widgets = widgets.len();
-		layout_constraints.reserve(num_widgets);
+		widget_constraints.reserve(num_widgets);
 
 		// bottom up request size hints/policies and content sizes if appropriate
 		hierarchy.visit_leaves_first(None, |widget_id| {
-			let mut constraints = layout_constraints.get(&widget_id).cloned().unwrap_or_default();
+			let mut constraints = widget_constraints.get(&widget_id).cloned().unwrap_or_default();
 			let children = hierarchy.children(widget_id);
 
 			let widget_state = widgets.get_mut(&widget_id).unwrap();
 			widget_state.widget.constrain(ConstraintContext {
 				constraints: &mut constraints,
 				children,
-				constraint_map: &mut layout_constraints,
+				constraint_map: &mut widget_constraints,
 
 				state: &mut widget_state.state,
 			});
 
-			layout_constraints.insert(widget_id, constraints);
+			widget_constraints.insert(widget_id, constraints);
 		});
 
 		self.widget_layouts.clear();
 		self.widget_layouts.reserve(num_widgets);
 
 		for &widget_id in hierarchy.root_node.children.iter() {
-			layout_children_linear(available_bounds, Axis::Horizontal, Align::Start, &[widget_id], &layout_constraints, &mut self.widget_layouts);
+			layout_children_linear(available_bounds, Axis::Horizontal, Align::Start, &[widget_id], &widget_constraints, &mut self.widget_layouts);
 		}
 
 		// top down resolve layouts and assign rects
 		hierarchy.visit_breadth_first(None, |widget_id, children| {
 			// this widget should already be laid out or root
 			let content_bounds = self.widget_layouts[&widget_id].content_bounds;
-			let constraints = &layout_constraints[&widget_id];
+			let constraints = &widget_constraints[&widget_id];
 			let main_axis = constraints.layout_axis.get();
 			let content_alignment = constraints.content_alignment.get();
 
 			// TODO(pat.m): layout mode?
-			layout_children_linear(content_bounds, main_axis, content_alignment, children, &layout_constraints, &mut self.widget_layouts);
+			layout_children_linear(content_bounds, main_axis, content_alignment, children, &widget_constraints, &mut self.widget_layouts);
 		});
 	}
 
-	pub fn handle_input(&mut self, _input: &Input) {
+	fn handle_input(&mut self, _input: &Input) {
 		// Persist widget bounds
 		let mut input_handlers = self.persistent_state.input_handlers.borrow_mut();
 		input_handlers.clear();
@@ -218,7 +218,7 @@ impl<'ps> Ui<'ps> {
 			});
 	}
 
-	pub fn draw(&mut self, painter: &mut Painter) {
+	fn draw(&mut self, painter: &mut Painter) {
 		let mut widgets = self.persistent_state.widgets.borrow_mut();
 
 		// draw from root to leaves

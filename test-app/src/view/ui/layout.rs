@@ -272,6 +272,11 @@ impl LayoutConstraints {
 		self.set_width(size.x);
 		self.set_height(size.y);
 	}
+
+	pub fn set_size_policy(&mut self, policy: SizingBehaviour) {
+		self.horizontal_size_policy.set(policy);
+		self.vertical_size_policy.set(policy);
+	}
 }
 
 
@@ -592,11 +597,12 @@ pub fn outset_lengths(bounds: &Aabb2, lengths: &BoxLengths) -> Aabb2 {
 pub struct Layout {
 	pub position: Vec2,
 	pub size: Vec2,
-	pub final_size: bool,
 
 	pub box_bounds: Aabb2,
 	pub margin_bounds: Aabb2,
 	pub content_bounds: Aabb2,
+
+	final_size: bool,
 }
 
 impl Default for Layout {
@@ -604,11 +610,12 @@ impl Default for Layout {
 		Layout {
 			position: Vec2::zero(),
 			size: Vec2::zero(),
-			final_size: false,
 
 			box_bounds: Aabb2::zero(),
 			margin_bounds: Aabb2::zero(),
 			content_bounds: Aabb2::zero(),
+
+			final_size: false,
 		}
 	}
 }

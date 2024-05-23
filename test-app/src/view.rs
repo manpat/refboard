@@ -47,15 +47,16 @@ impl View {
 		let view_bounds = self.viewport.view_bounds();
 
 		self.ui.run(view_bounds, painter, &self.input, |ui| {
-			ui.push_layout(ui.add_widget(ui::FrameWidget::vertical()));
+			ui.push_layout(
+				ui.add_widget(ui::FrameWidget::vertical())
+					.with_constraints(|c| c.set_size_policy(ui::SizingBehaviour::FLEXIBLE))
+			);
 
 			let frame = ui.add_widget(ui::FrameWidget::horizontal())
-				.set_constraints(|c| c.margin.set(8.0));
+				.with_constraints(|c| c.margin.set(8.0));
 
 			if frame.is_hovered() {
-				frame.widget(|frame, _| {
-					frame.background_color = Color::grey_a(0.5, 0.1);
-				});
+				frame.widget().background_color = Color::grey_a(0.5, 0.1);
 			}
 
 			if frame.is_clicked() {
@@ -67,9 +68,7 @@ impl View {
 				let frame = ui.add_widget(ui::FrameWidget::horizontal().with_color(Color::green().with_alpha(0.2)));
 
 				if frame.is_hovered() {
-					frame.widget(|frame, _| {
-						frame.background_color = Color::green();
-					});
+					frame.widget().background_color = Color::green();
 				}
 
 				if frame.is_clicked() {
@@ -83,15 +82,15 @@ impl View {
 
 			ui.push_layout(ui.add_widget(ui::FrameWidget::horizontal()));
 			for _ in 0..app.dummy.get() {
-				add_widget(5).set_constraints(|c| c.set_size((50.0, 50.0)));
+				add_widget(5).with_constraints(|c| c.set_size((50.0, 50.0)));
 			}
 			ui.pop_layout();
 
 			ui.push_layout(frame);
-			add_widget(0).set_constraints(|c| c.set_size((20.0, 20.0)));
-			add_widget(1).set_constraints(|c| c.set_size((50.0, 50.0)));
-			add_widget(2).set_constraints(|c| c.set_size((100.0, 50.0)));
-			add_widget(3).set_constraints(|c| c.set_size((50.0, 100.0)));
+			add_widget(0).constraints().set_size((20.0, 20.0));
+			add_widget(1).constraints().set_size((50.0, 50.0));
+			add_widget(2).constraints().set_size((100.0, 50.0));
+			add_widget(3).constraints().set_size((50.0, 100.0));
 			ui.pop_layout();
 
 			ui.pop_layout();
