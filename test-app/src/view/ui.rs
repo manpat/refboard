@@ -288,7 +288,11 @@ impl Ui<'_> {
 
 		WidgetRef { widget_id, ui: self, phantom: PhantomData }
 	}
+}
 
+
+/// Layouts
+impl Ui<'_> {
 	pub fn push_layout(&self, widget_id: impl Into<WidgetId>) {
 		self.stack.borrow_mut().push(widget_id.into());
 	}
@@ -296,25 +300,7 @@ impl Ui<'_> {
 	pub fn pop_layout(&self) {
 		self.stack.borrow_mut().pop().expect("Parent stack empty!");
 	}
-}
 
-impl Ui<'_> {
-	pub fn dummy(&self) -> WidgetRef<'_, ()> {
-		self.add_widget(())
-	}
-
-	pub fn spring(&self, axis: Axis) -> WidgetRef<'_, Spring> {
-		// TODO(pat.m): can I derive Axis from context?
-		self.add_widget(Spring(axis))
-	}
-
-	pub fn button(&self) -> WidgetRef<'_, Button> {
-		self.add_widget(Button)
-	}
-}
-
-
-impl Ui<'_> {
 	pub fn with_parent(&self, layout_id: impl Into<WidgetId>, f: impl FnOnce()) {
 		self.push_layout(layout_id);
 		f();

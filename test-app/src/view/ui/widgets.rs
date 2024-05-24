@@ -5,6 +5,23 @@ use std::fmt::{self, Debug};
 
 
 
+impl Ui<'_> {
+	pub fn dummy(&self) -> WidgetRef<'_, ()> {
+		self.add_widget(())
+	}
+
+	pub fn spring(&self, axis: Axis) -> WidgetRef<'_, Spring> {
+		// TODO(pat.m): can I derive Axis from context?
+		self.add_widget(Spring(axis))
+	}
+
+	pub fn button(&self) -> WidgetRef<'_, Button> {
+		self.add_widget(Button)
+	}
+}
+
+
+
 impl Widget for () {
 	fn constrain(&self, ctx: ConstraintContext<'_>) {
 		ctx.constraints.margin.set_default(4.0);
