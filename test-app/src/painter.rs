@@ -15,6 +15,8 @@ pub struct Painter {
 	stroke_options: StrokeOptions,
 
 	scratch_path: PathBuffer,
+
+	clip_rect: [u16; 4],
 }
 
 impl Painter {
@@ -28,6 +30,8 @@ impl Painter {
 			stroke_options: StrokeOptions::tolerance(0.1),
 
 			scratch_path: PathBuffer::new(),
+
+			clip_rect: [0, u16::MAX, 0, u16::MAX],
 		}
 	}
 
@@ -37,11 +41,22 @@ impl Painter {
 
 		self.fill_options = FillOptions::tolerance(0.5).with_fill_rule(FillRule::NonZero);
 		self.stroke_options = StrokeOptions::tolerance(0.5);
+
+		self.clip_rect = [0, u16::MAX, 0, u16::MAX];
 	}
 
-	fn geo_builder<'g>(geo: &'g mut VertexBuffers<renderer::Vertex, u32>, color: impl Into<Color>) -> (impl StrokeGeometryBuilder + FillGeometryBuilder + 'g) {
+	fn with_stroker(&mut self, color: impl Into<Color>, f: impl FnOnce(&mut StrokeTessellator, &StrokeOptions, &mut BuffersBuilder<'_, renderer::Vertex, u32, VertexConstructor>))
+	{
 		let color = color.into().to_array();
-		BuffersBuilder::new(geo, VertexConstructor { color })
+		f(&mut self.stroke_tess, &self.stroke_options,
+			&mut BuffersBuilder::new(&mut self.geometry, VertexConstructor { color, clip_rect: self.clip_rect }) );
+	}
+
+	fn with_filler(&mut self, color: impl Into<Color>, f: impl FnOnce(&mut FillTessellator, &FillOptions, &mut BuffersBuilder<'_, renderer::Vertex, u32, VertexConstructor>))
+	{
+		let color = color.into().to_array();
+		f(&mut self.fill_tess, &self.fill_options,
+			&mut BuffersBuilder::new(&mut self.geometry, VertexConstructor { color, clip_rect: self.clip_rect }) );
 	}
 }
 
@@ -49,59 +64,67 @@ impl Painter {
 	pub fn set_line_width(&mut self, width: f32) {
 		self.stroke_options.line_width = width;
 	}
+
+	pub fn set_clip_rect(&mut self, clip_rect: [u16; 4]) {
+		self.clip_rect = clip_rect;
+	}
 }
 
 impl Painter {
 	pub fn circle_outline(&mut self, pos: impl Into<Vec2>, r: f32, color: impl Into<Color>) {
 		let pos = to_point(pos.into());
-		self.stroke_tess.tessellate_circle(pos, r, &self.stroke_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+		self.with_stroker(color, |tess, opts, builder| tess.tessellate_circle(pos, r, opts, builder).unwrap());
 	}
 
 	pub fn circle(&mut self, pos: impl Into<Vec2>, r: f32, color: impl Into<Color>) {
 		let pos = to_point(pos.into());
-		self.fill_tess.tessellate_circle(pos, r, &self.fill_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+		self.with_filler(color, |tess, opts, builder| tess.tessellate_circle(pos, r, opts, builder).unwrap());
 	}
 
 	pub fn rect_outline(&mut self, rect: impl Into<Aabb2>, color: impl Into<Color>) {
 		let rect = to_box(rect.into());
-		self.stroke_tess.tessellate_rectangle(&rect, &self.stroke_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+		self.with_stroker(color, |tess, opts, builder| tess.tessellate_rectangle(&rect, opts, builder).unwrap());
 	}
 
 	pub fn rect(&mut self, rect: impl Into<Aabb2>, color: impl Into<Color>) {
 		let rect = to_box(rect.into());
-		self.fill_tess.tessellate_rectangle(&rect, &self.fill_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+		self.with_filler(color, |tess, opts, builder| tess.tessellate_rectangle(&rect, opts, builder).unwrap());
 	}
 
 	pub fn rounded_rect_outline(&mut self, rect: impl Into<Aabb2>, radii: impl IntoBorderRadii, color: impl Into<Color>) {
 		let rect = to_box(rect.into());
 
-		self.scratch_path.clear();
+		let mut scratch_path = std::mem::take(&mut self.scratch_path);
+		scratch_path.clear();
 
-		let mut builder = self.scratch_path.builder();
+		let mut builder = scratch_path.builder();
 		builder.add_rounded_rectangle(&rect, &radii.to_radii(), PathWinding::Positive, &[]);
 		builder.build();
 
-		self.stroke_tess.tessellate(self.scratch_path.get(0).iter(), &self.stroke_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+		self.with_stroker(color, |tess, opts, builder| tess.tessellate(scratch_path.get(0).iter(), opts, builder).unwrap());
+		self.scratch_path = scratch_path;
 	}
 
 	pub fn rounded_rect(&mut self, rect: impl Into<Aabb2>, radii: impl IntoBorderRadii, color: impl Into<Color>) {
 		let rect = to_box(rect.into());
 
-		self.scratch_path.clear();
+		let mut scratch_path = std::mem::take(&mut self.scratch_path);
+		scratch_path.clear();
 
-		let mut builder = self.scratch_path.builder();
+		let mut builder = scratch_path.builder();
 		builder.add_rounded_rectangle(&rect, &radii.to_radii(), PathWinding::Positive, &[]);
 		builder.build();
 
-		self.fill_tess.tessellate(self.scratch_path.get(0).iter(), &self.fill_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+		self.with_filler(color, |tess, opts, builder| tess.tessellate(scratch_path.get(0).iter(), opts, builder).unwrap());
+		self.scratch_path = scratch_path;
 	}
 
 	pub fn stroke_path(&mut self, path: &Path, color: impl Into<Color>) {
-		self.stroke_tess.tessellate_path(path, &self.stroke_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+		self.with_stroker(color, |tess, opts, builder| tess.tessellate_path(path, opts, builder).unwrap());
 	}
 
 	pub fn fill_path(&mut self, path: &Path, color: impl Into<Color>) {
-		self.fill_tess.tessellate_path(path, &self.fill_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+		self.with_filler(color, |tess, opts, builder| tess.tessellate_path(path, opts, builder).unwrap());
 	}
 
 	pub fn line(&mut self, start: impl Into<Vec2>, end: impl Into<Vec2>, color: impl Into<Color>) {
@@ -125,7 +148,7 @@ impl Painter {
 			},
 		];
 
-		self.stroke_tess.tessellate(events, &self.stroke_options, &mut Self::geo_builder(&mut self.geometry, color)).unwrap();
+		self.with_stroker(color, move |tess, opts, builder| tess.tessellate(events, opts, builder).unwrap());
 	}
 }
 
@@ -153,7 +176,7 @@ impl IntoBorderRadii for BorderRadii {
 
 struct VertexConstructor {
 	color: [f32; 4],
-
+	clip_rect: [u16; 4],
 }
 
 impl FillVertexConstructor<renderer::Vertex> for VertexConstructor {
@@ -162,6 +185,7 @@ impl FillVertexConstructor<renderer::Vertex> for VertexConstructor {
 		renderer::Vertex {
 			pos,
 			color: self.color,
+			clip_rect: self.clip_rect,
 		}
 	}
 }
@@ -172,6 +196,7 @@ impl StrokeVertexConstructor<renderer::Vertex> for VertexConstructor {
 		renderer::Vertex {
 			pos,
 			color: self.color,
+			clip_rect: self.clip_rect,
 		}
 	}
 }

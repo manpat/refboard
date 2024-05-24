@@ -95,7 +95,7 @@ impl StateBox {
 	{
 		// If we have a value but the type is wrong, reset it to default
 		if !self.has::<T>() {
-			self.set(T::default());
+			self.0 = Some(Box::new(T::default()));
 		}
 
 		// SAFETY: We're calling set above, so we know that the Option is populated and with what type.

@@ -113,7 +113,7 @@ impl Renderer {
 				buffers: &[wgpu::VertexBufferLayout {
 					array_stride: std::mem::size_of::<Vertex>() as u64,
 					step_mode: wgpu::VertexStepMode::Vertex,
-					attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x4],
+					attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x4, 2 => Uint16x4],
 				}],
 			},
 			fragment: Some(wgpu::FragmentState {
@@ -335,6 +335,9 @@ unsafe impl bytemuck::Zeroable for Globals {}
 pub struct Vertex {
 	pub pos: [f32; 2],
 	pub color: [f32; 4],
+
+	// min x, max x, min y, max y
+	pub clip_rect: [u16; 4],
 }
 
 unsafe impl bytemuck::Pod for Vertex {}
