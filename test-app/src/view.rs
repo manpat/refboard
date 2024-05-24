@@ -183,7 +183,7 @@ impl View {
 use winit::event::{WindowEvent, ElementState, MouseButton};
 use winit::dpi::PhysicalPosition;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Input {
 	raw_cursor_pos: Option<Vec2>,
 

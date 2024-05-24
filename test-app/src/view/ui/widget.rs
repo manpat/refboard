@@ -110,8 +110,10 @@ impl<'ui, T> WidgetRef<'ui, T> {
 	}
 
 	pub fn is_clicked(&self) -> bool {
-		self.is_hovered() && self.ui.click_happened
+		self.is_hovered() && self.ui.input.click_received
 	}
+
+	// TODO(pat.m): is focussed
 }
 
 impl<'ui, T> From<&'_ WidgetRef<'ui, T>> for WidgetId {

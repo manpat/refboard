@@ -34,8 +34,7 @@ impl System {
 
 		self.process_input(input);
 
-		let mut ui = Ui::new(&self.persistent_state);
-		ui.click_happened = input.click_received;
+		let mut ui = Ui::new(&self.persistent_state, input);
 
 		build_ui(&ui);
 
@@ -49,15 +48,21 @@ impl System {
 	fn process_input(&mut self, input: &Input) {
 		self.persistent_state.hovered_widget.set(None);
 
+		// TODO(pat.m): collect input behaviour from existing widgets
+
 		if let Some(cursor_pos) = input.cursor_pos_view {
 			let input_handlers = self.persistent_state.input_handlers.borrow();
 
+			// TODO(pat.m): instead of just storing the last hovered widget, store a 'stack' of hovered widgets
 			self.persistent_state.hierarchy.borrow()
 				.visit_breadth_first(None, |widget_id, _| {
 					if input_handlers[&widget_id].contains_point(cursor_pos) {
 						self.persistent_state.hovered_widget.set(Some(widget_id));
 					}
 				});
+
+			// TODO(pat.m): from the input behaviour of each widget in the hovered widget stack, calculate the target of 
+			// any mouse click/keyboard events.
 		}
 	}
 
@@ -140,23 +145,20 @@ pub struct Ui<'ps> {
 	widget_constraints: RefCell<LayoutConstraintMap>,
 	widget_layouts: LayoutMap,
 
-	// TODO(pat.m): take directly from Input
-	click_happened: bool,
-
 	persistent_state: &'ps PersistentState,
+	input: &'ps Input,
 }
 
 impl<'ps> Ui<'ps> {
-	fn new(persistent_state: &'ps PersistentState) -> Ui<'ps> {
+	fn new(persistent_state: &'ps PersistentState, input: &'ps Input) -> Ui<'ps> {
 		Ui {
 			stack: Default::default(),
 			widget_constraints: LayoutConstraintMap::default().into(),
 
 			widget_layouts: LayoutMap::new(),
 
-			click_happened: false,
-
 			persistent_state,
+			input,
 		}
 	}
 
