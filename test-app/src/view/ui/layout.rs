@@ -340,7 +340,9 @@ impl LayoutConstraints {
 
 	pub fn min_length(&self, axis: Axis) -> f32 {
 		if self.size_policy(axis).contains(SizingBehaviour::CAN_SHRINK) {
-			self.min_length_unconstrained(axis).max(self.padding.axis_sum(axis))
+			self.min_length_unconstrained(axis)
+				.max(self.padding.axis_sum(axis))
+				.min(self.max_length_unconstrained(axis))
 		} else {
 			self.preferred_length(axis)
 		}
@@ -348,7 +350,9 @@ impl LayoutConstraints {
 
 	pub fn max_length(&self, axis: Axis) -> f32 {
 		if self.size_policy(axis).contains(SizingBehaviour::CAN_GROW) {
-			self.max_length_unconstrained(axis).max(self.padding.axis_sum(axis))
+			self.max_length_unconstrained(axis)
+				.max(self.padding.axis_sum(axis))
+				.max(self.min_length_unconstrained(axis))
 		} else {
 			self.preferred_length(axis)
 		}
@@ -356,7 +360,8 @@ impl LayoutConstraints {
 
 	pub fn preferred_length(&self, axis: Axis) -> f32 {
 		self.preferred_length_unconstrained(axis)
-			.clamp(self.min_length_unconstrained(axis), self.max_length_unconstrained(axis))
+			.max(self.min_length_unconstrained(axis))
+			.min(self.max_length_unconstrained(axis))
 			.max(self.padding.axis_sum(axis))
 	}
 }

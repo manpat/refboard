@@ -220,15 +220,43 @@ impl<'ps> Ui<'ps> {
 
 	fn draw(&mut self, painter: &mut Painter) {
 		let mut widgets = self.persistent_state.widgets.borrow_mut();
+		let hierarchy = self.persistent_state.hierarchy.borrow();
+
+		// TODO(pat.m): this is yucky - maybe we should actually calculate clip rects during layout?
+		// TODO(pat.m): also we may eventually want widgets to be able to ignore the parent clip rect
 
 		// draw from root to leaves
-		self.persistent_state.hierarchy.borrow()
-			.visit_breadth_first(None, |widget_id, _| {
-				let layout = &self.widget_layouts[&widget_id];
-				let widget_state = widgets.get_mut(&widget_id).unwrap();
+		let null_clip_rect = Aabb2::new(Vec2::zero(), Vec2::splat(u16::MAX as f32));
+		hierarchy.visit_breadth_first_with_parent_context(null_clip_rect, |widget_id, parent_clip| {
+			let layout = &self.widget_layouts[&widget_id];
+			let widget_state = widgets.get_mut(&widget_id).unwrap();
 
-				widget_state.widget.draw(painter, layout, &mut widget_state.state);
-			});
+			let clip_rect = to_4u16(&parent_clip);
+
+			painter.set_clip_rect(clip_rect);
+			widget_state.widget.draw(painter, layout, &mut widget_state.state);
+
+			painter.set_clip_rect(to_4u16(&null_clip_rect));
+			painter.rect_outline(parent_clip, Color::white());
+
+			clip_rects(&layout.box_bounds, &parent_clip)
+		});
+
+		fn to_4u16(bounds: &Aabb2) -> [u16; 4] {
+			let min_x = bounds.min.x.round().clamp(0.0, u16::MAX as f32) as i32 as u16;
+			let max_x = bounds.max.x.round().clamp(0.0, u16::MAX as f32) as i32 as u16;
+			let min_y = bounds.min.y.round().clamp(0.0, u16::MAX as f32) as i32 as u16;
+			let max_y = bounds.max.y.round().clamp(0.0, u16::MAX as f32) as i32 as u16;
+			[min_x, max_x, min_y, max_y]
+		}
+
+		// TODO(pat.m): why is this not on Aabb2
+		fn clip_rects(lhs: &Aabb2, rhs: &Aabb2) -> Aabb2 {
+			Aabb2 {
+				min: Vec2::new(lhs.min.x.max(rhs.min.x), lhs.min.y.max(rhs.min.y)),
+				max: Vec2::new(lhs.max.x.min(rhs.max.x), lhs.max.y.min(rhs.max.y)),
+			}
+		}
 	}
 }
 

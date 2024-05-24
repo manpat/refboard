@@ -72,7 +72,8 @@ impl View {
 				for _ in 0..app.dummy.get() {
 					add_widget(5).with_constraints(|c| c.set_size((50.0, 50.0)));
 				}
-			});
+			})
+			.with_constraints(|c| c.max_width.set(280.0));
 
 			let frame = ui.add_widget(ui::FrameWidget::horizontal())
 				.with_constraints(|c| c.margin.set(8.0));

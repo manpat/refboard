@@ -168,6 +168,28 @@ impl Hierarchy {
 		}
 	}
 
+	pub fn visit_breadth_first_with_parent_context<F, C>(&self, init: C, mut visit: F)
+		where F: FnMut(WidgetId, C) -> C
+			, C: Copy
+	{
+		// TODO(pat.m): reuse intermediate visit structures
+		let mut visit_queue = VecDeque::new();
+
+		let children = self.root_node.children.as_slice();
+
+		visit_queue.extend(children.iter().copied().zip(std::iter::repeat(init)));
+
+		while let Some((parent, parent_ctx)) = visit_queue.pop_front() {
+			let child_ctx = visit(parent, parent_ctx);
+			visit_queue.extend(
+				self.nodes[&parent].children
+					.iter()
+					.copied()
+					.zip(std::iter::repeat(child_ctx))
+			);
+		}
+	}
+
 	/// Postorder traversal
 	pub fn visit_leaves_first<F>(&self, start: impl Into<Option<WidgetId>>, mut visit: F)
 		where F: FnMut(WidgetId)
