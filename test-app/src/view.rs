@@ -68,11 +68,11 @@ impl View {
 				frame
 			};
 
-			ui.push_layout(ui.add_widget(ui::FrameWidget::horizontal()));
-			for _ in 0..app.dummy.get() {
-				add_widget(5).with_constraints(|c| c.set_size((50.0, 50.0)));
-			}
-			ui.pop_layout();
+			ui.with_parent_widget(ui::FrameWidget::horizontal(), || {
+				for _ in 0..app.dummy.get() {
+					add_widget(5).with_constraints(|c| c.set_size((50.0, 50.0)));
+				}
+			});
 
 			let frame = ui.add_widget(ui::FrameWidget::horizontal())
 				.with_constraints(|c| c.margin.set(8.0));
@@ -86,16 +86,15 @@ impl View {
 				app.hack_changed.set(true);
 			}
 
-			ui.push_layout(frame);
-			add_widget(0).constraints().set_size((20.0, 20.0));
-			add_widget(1).constraints().set_size((50.0, 50.0));
-			add_widget(2).constraints().set_size((100.0, 50.0));
-			add_widget(3).constraints().set_size((50.0, 100.0));
-			ui.pop_layout();
+			ui.with_parent(frame, || {
+				add_widget(0).constraints().set_size((20.0, 20.0));
+				add_widget(1).constraints().set_size((50.0, 50.0));
+				add_widget(2).constraints().set_size((100.0, 50.0));
+				add_widget(3).constraints().set_size((50.0, 100.0));
+			});
 
 
-			ui.push_layout(ui.add_widget(ui::BoxLayout::horizontal()));
-			{
+			ui.with_horizontal_layout(|| {
 				#[derive(Default, Debug)]
 				struct Stateful;
 
@@ -142,28 +141,26 @@ impl View {
 
 				ui.add_widget(())
 					.with_constraints(|c| match widget.is_active() {
-						true => c.set_width(100.0),
+						true => c.horizontal_size_policy.set(ui::SizingBehaviour::FLEXIBLE),
 						false => c.set_width(40.0),
 					});
-			}
-			ui.pop_layout();
+			})
+			.with_constraints(|c| c.horizontal_size_policy.set(ui::SizingBehaviour::FLEXIBLE));
 
 
 			ui.spring(ui::Axis::Vertical);
 
-			ui.push_layout(ui.add_widget(ui::BoxLayout::horizontal()));
+			ui.with_horizontal_layout(|| {
+				if ui.button().is_clicked() {
+					app.dummy.set(app.dummy.get() + 1);
+					app.hack_changed.set(true);
+				}
 
-			if ui.button().is_clicked() {
-				app.dummy.set(app.dummy.get() + 1);
-				app.hack_changed.set(true);
-			}
-
-			if ui.button().is_clicked() {
-				app.dummy.set(app.dummy.get().saturating_sub(1));
-				app.hack_changed.set(true);
-			}
-
-			ui.pop_layout();
+				if ui.button().is_clicked() {
+					app.dummy.set(app.dummy.get().saturating_sub(1));
+					app.hack_changed.set(true);
+				}
+			});
 
 			ui.pop_layout();
 		});

@@ -298,7 +298,6 @@ impl Ui<'_> {
 	}
 }
 
-
 impl Ui<'_> {
 	pub fn dummy(&self) -> WidgetRef<'_, ()> {
 		self.add_widget(())
@@ -314,3 +313,27 @@ impl Ui<'_> {
 	}
 }
 
+
+impl Ui<'_> {
+	pub fn with_parent(&self, layout_id: impl Into<WidgetId>, f: impl FnOnce()) {
+		self.push_layout(layout_id);
+		f();
+		self.pop_layout();
+	}
+
+	pub fn with_parent_widget<W>(&self, layout_widget: W, f: impl FnOnce()) -> WidgetRef<'_, W>
+		where W: Widget
+	{
+		let layout = self.add_widget(layout_widget);
+		self.with_parent(&layout, f);
+		layout
+	}
+
+	pub fn with_horizontal_layout(&self, f: impl FnOnce()) -> WidgetRef<'_, BoxLayout> {
+		self.with_parent_widget(BoxLayout::horizontal(), f)
+	}
+
+	pub fn with_vertical_layout(&self, f: impl FnOnce()) -> WidgetRef<'_, BoxLayout> {
+		self.with_parent_widget(BoxLayout::vertical(), f)
+	}
+}
