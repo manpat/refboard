@@ -227,8 +227,8 @@ impl Widget for Button {
 
 
 // TODO(pat.m): more dynamic
-const HACK_FONT_SIZE: f32 = 20.0;
-const HACK_LINE_HEIGHT: f32 = 32.0;
+const HACK_FONT_SIZE: f32 = 32.0;
+const HACK_LINE_HEIGHT: f32 = 40.0;
 
 
 
@@ -298,7 +298,6 @@ impl Widget for Text {
 		let state = ctx.state.get::<TextState>();
 
 		ctx.painter.rect_outline(ctx.layout.box_bounds, Color::grey_a(0.5, 0.1));
-		// ctx.painter.rect(ctx.layout.content_bounds, Color::grey(1.0));
 
 		let font_system = &mut ctx.text_state.font_system;
 
@@ -306,25 +305,25 @@ impl Widget for Text {
 		let start_pos = ctx.layout.content_bounds.min;
 		state.buffer.set_size(font_system, size.x, size.y);
 
-		for run in state.buffer.layout_runs() {
-			for glyph in run.glyphs.iter() {
-				let physical_glyph = glyph.physical(start_pos.to_tuple(), 1.0);
+		// for run in state.buffer.layout_runs() {
+		// 	for glyph in run.glyphs.iter() {
+		// 		let physical_glyph = glyph.physical(start_pos.to_tuple(), 1.0);
 
-				// TODO(pat.m): check local cache first - otherwise stage returned image for text atlas upload
-				// text_state.glyph_info(physical_glyph.cache_key)
-				let Some(image) = ctx.text_state.swash_cache.get_image(font_system, physical_glyph.cache_key)
-					else { continue };
+		// 		// TODO(pat.m): check local cache first - otherwise stage returned image for text atlas upload
+		// 		// text_state.glyph_info(physical_glyph.cache_key)
+		// 		let Some(image) = ctx.text_state.swash_cache.get_image(font_system, physical_glyph.cache_key)
+		// 			else { continue };
 
-				let placement = image.placement;
+		// 		let placement = image.placement;
 
-				let pos = Vec2::new(physical_glyph.x as f32 + placement.left as f32, physical_glyph.y as f32 - placement.top as f32 + run.line_y);
-				let size = Vec2::new(placement.width as f32, placement.height as f32);
-				let bounds = Aabb2::new(pos, pos + size);
-				ctx.painter.rect_outline(bounds, Color::grey_a(0.5, 0.1));
-			}
-		}
+		// 		let pos = Vec2::new(physical_glyph.x as f32 + placement.left as f32, physical_glyph.y as f32 - placement.top as f32 + run.line_y);
+		// 		let size = Vec2::new(placement.width as f32, placement.height as f32);
+		// 		let bounds = Aabb2::new(pos, pos + size);
+		// 		ctx.painter.rect_outline(bounds, Color::grey_a(0.5, 0.1));
+		// 	}
+		// }
 
-		let text_color = ct::Color::rgb(0xdd, 0x55, 0xdd);
+		let text_color = ct::Color::rgb(0xff, 0xff, 0xff);
 		state.buffer.draw(font_system, &mut ctx.text_state.swash_cache, text_color, |x, y, w, h, color| {
 			let pos = Vec2::new(x as f32, y as f32) + start_pos;
 			let size = Vec2::new(w as f32, h as f32);

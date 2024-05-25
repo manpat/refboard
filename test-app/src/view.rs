@@ -173,6 +173,9 @@ impl View {
 			ui.pop_layout();
 		});
 
+		// TODO(pat.m): yuck
+		painter.set_clip_rect([0, 65535, 0, 65535]);
+
 		// Cursor
 		if let Some(cursor_pos) = self.input.cursor_pos_view {
 			painter.circle(cursor_pos, 3.0, [1.0, 0.0, 0.0]);
