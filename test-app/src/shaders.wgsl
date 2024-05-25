@@ -23,8 +23,12 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
 
     let clip_position = transform * vec3f(vertex.position, 1.0);
 
+    // Premultiply vertex color
+    let color = vertex.color;
+    let color_premul = vec4f(color.rgb * color.a, color.a);
+
     return VertexOutput(
-        vertex.color,
+        color_premul,
         vertex.clip_rect,
         vec4f(clip_position, 0.5, 1.0)
     );

@@ -52,7 +52,12 @@ impl View {
 					.with_constraints(|c| c.set_size_policy(ui::SizingBehaviour::FLEXIBLE))
 			);
 
-			ui.text("Hello, Rust! 🦀 🐄🦐🅱 I'm emoting العربية ");
+			ui.text("Hello, Rust! 🦀 🐄🦐🅱\nI'm emoting العربية ");
+			ui.text("Now I have a text widget lol lmao")
+				.with_constraints(|c| c.self_alignment.set(ui::Align::End));
+
+			ui.text("Now I'm centre aligned")
+				.with_constraints(|c| c.self_alignment.set(ui::Align::Middle));
 
 			let add_widget = |idx| {
 				let frame = ui.add_widget(ui::FrameWidget::horizontal().with_color(Color::green().with_alpha(0.2)));
@@ -109,7 +114,7 @@ impl View {
 
 				impl ui::Widget for Stateful {
 					fn draw(&self, ctx: ui::DrawContext<'_>) {
-						let state = ctx.state.get::<StatefulState>();
+						let state = ctx.state.get_or_default::<StatefulState>();
 
 						let color = match (state.active, state.hovered) {
 							(true, false) => Color::green(),

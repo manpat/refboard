@@ -105,7 +105,7 @@ impl<'ui, T> WidgetRef<'ui, T> {
 	pub fn state_as<S>(&self) -> RefMut<'ui, S>
 		where S: Default + 'static
 	{
-		RefMut::map(self.state(), |s| s.get())
+		RefMut::map(self.state(), |s| s.get_or_default())
 	}
 
 	pub fn constraints(&self) -> RefMut<'ui, LayoutConstraints> {

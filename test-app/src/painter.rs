@@ -82,7 +82,7 @@ impl Painter {
 	}
 
 	pub fn rect_outline(&mut self, rect: impl Into<Aabb2>, color: impl Into<Color>) {
-		let rect = to_box(rect.into());
+		let rect = to_box_centroid(rect.into());
 		self.with_stroker(color, |tess, opts, builder| tess.tessellate_rectangle(&rect, opts, builder).unwrap());
 	}
 
@@ -92,7 +92,7 @@ impl Painter {
 	}
 
 	pub fn rounded_rect_outline(&mut self, rect: impl Into<Aabb2>, radii: impl IntoBorderRadii, color: impl Into<Color>) {
-		let rect = to_box(rect.into());
+		let rect = to_box_centroid(rect.into());
 
 		let mut scratch_path = std::mem::take(&mut self.scratch_path);
 		scratch_path.clear();
@@ -210,5 +210,13 @@ fn to_point(Vec2{x,y}: Vec2) -> Point {
 fn to_box(Aabb2{min, max}: Aabb2) -> Box2D {
 	// TODO(pat.m): make this more intentional
 	// Box2D::new(to_point(min.ceil() - Vec2::splat(0.5)), to_point(max.floor() + Vec2::splat(0.5)))
+	// Box2D::new(to_point(min.floor() + Vec2::splat(0.5)), to_point(max.floor() - Vec2::splat(0.5)))
+	Box2D::new(to_point((min + Vec2::splat(0.5)).floor()), to_point((max + Vec2::splat(0.5)).floor()))
+}
+
+fn to_box_centroid(Aabb2{min, max}: Aabb2) -> Box2D {
+	// TODO(pat.m): make this more intentional
+	// Box2D::new(to_point(min.ceil() - Vec2::splat(0.5)), to_point(max.floor() + Vec2::splat(0.5)))
+	// Box2D::new(to_point(min.floor() + Vec2::splat(0.5)), to_point(max.floor() - Vec2::splat(0.5)))
 	Box2D::new(to_point(min.floor() + Vec2::splat(0.5)), to_point(max.floor() - Vec2::splat(0.5)))
 }

@@ -21,6 +21,10 @@ impl<T> WidgetParameter<T> {
 		}
 	}
 
+	pub fn is_set(&self) -> bool {
+		self.set
+	}
+
 	pub fn set(&mut self, value: T) {
 		self.value = value;
 		self.set = true;

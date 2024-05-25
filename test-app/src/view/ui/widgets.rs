@@ -226,6 +226,10 @@ impl Widget for Button {
 
 
 
+// TODO(pat.m): more dynamic
+const HACK_FONT_SIZE: f32 = 20.0;
+const HACK_LINE_HEIGHT: f32 = 32.0;
+
 
 
 #[derive(Debug)]
@@ -237,19 +241,94 @@ struct TextState {
 }
 
 impl Widget for Text {
+	fn lifecycle(&mut self, ctx: LifecycleContext<'_>) {
+		if ctx.event == WidgetLifecycleEvent::Destroyed {
+			return
+		}
+
+		let font_system = &mut ctx.text_state.font_system;
+
+		let metrics = cosmic_text::Metrics::new(HACK_FONT_SIZE, HACK_LINE_HEIGHT);
+
+		if ctx.event == WidgetLifecycleEvent::Created {
+			let mut buffer = cosmic_text::Buffer::new(font_system, metrics);
+			buffer.set_size(font_system, 1000.0, 1000.0);
+			buffer.set_wrap(font_system, cosmic_text::Wrap::None);
+			ctx.state.set(TextState {buffer});
+		}
+
+		let state = ctx.state.get::<TextState>();
+		let mut buffer = state.buffer.borrow_with(font_system);
+
+		// if ctx.event == WidgetLifecycleEvent::Updated {
+		// 	buffer.set_metrics(metrics);
+		// }
+
+		let attrs = cosmic_text::Attrs::new();
+		buffer.set_text(&self.0, attrs, cosmic_text::Shaping::Advanced);
+	}
+
 	fn constrain(&self, ctx: ConstraintContext<'_>) {
-		ctx.constraints.min_width.set_default(100.0);
-		ctx.constraints.min_height.set_default(32.0);
+		if !ctx.constraints.min_width.is_set() {
+			let state = ctx.state.get::<TextState>();
+			let buffer = state.buffer.borrow_with(&mut ctx.text_state.font_system);
+
+			let min_width = buffer.layout_runs()
+				.map(|run| run.line_w)
+				.max_by(|a, b| a.total_cmp(&b))
+				.unwrap_or(0.0);
+
+			ctx.constraints.min_width.set_default(min_width);
+		}
+
+		if !ctx.constraints.min_height.is_set() {
+			let state = ctx.state.get::<TextState>();
+			let buffer = state.buffer.borrow_with(&mut ctx.text_state.font_system);
+
+			let min_height = buffer.lines.len() as f32 * HACK_LINE_HEIGHT;
+
+			ctx.constraints.min_height.set_default(min_height);
+		}
 
 		ctx.constraints.horizontal_size_policy.set_default(SizingBehaviour::FIXED);
 		ctx.constraints.vertical_size_policy.set_default(SizingBehaviour::FIXED);
 	}
 
-	// fn lifecycle(&mut self, event: WidgetLifecycleEvent, state: &mut StateBox)
-
 	fn draw(&self, ctx: DrawContext<'_>) {
-		ctx.painter.rect_outline(ctx.layout.box_bounds, Color::grey(0.5));
+		let state = ctx.state.get::<TextState>();
 
+		ctx.painter.rect_outline(ctx.layout.box_bounds, Color::grey_a(0.5, 0.1));
+		// ctx.painter.rect(ctx.layout.content_bounds, Color::grey(1.0));
+
+		let font_system = &mut ctx.text_state.font_system;
+
+		let size = ctx.layout.content_bounds.size();
+		let start_pos = ctx.layout.content_bounds.min;
+		state.buffer.set_size(font_system, size.x, size.y);
+
+		for run in state.buffer.layout_runs() {
+			for glyph in run.glyphs.iter() {
+				let physical_glyph = glyph.physical(start_pos.to_tuple(), 1.0);
+				let Some(image) = ctx.text_state.swash_cache.get_image(font_system, physical_glyph.cache_key)
+					else { continue };
+
+				let placement = image.placement;
+
+				let pos = Vec2::new(physical_glyph.x as f32 + placement.left as f32, physical_glyph.y as f32 - placement.top as f32 + run.line_y);
+				let size = Vec2::new(placement.width as f32, placement.height as f32);
+				let bounds = Aabb2::new(pos, pos + size);
+				ctx.painter.rect_outline(bounds, Color::grey_a(0.5, 0.1));
+			}
+		}
+
+		let text_color = ct::Color::rgb(0xdd, 0x55, 0xdd);
+		state.buffer.draw(font_system, &mut ctx.text_state.swash_cache, text_color, |x, y, w, h, color| {
+			let pos = Vec2::new(x as f32, y as f32) + start_pos;
+			let size = Vec2::new(w as f32, h as f32);
+			let rect = Aabb2::new(pos, pos + size);
+
+			ctx.painter.rect(rect, Color::from(color.as_rgba()).to_linear());
+		});
 
 		// let mut text_state = self.text_state.borrow_mut();
 		// let text_state = &mut *text_state;
@@ -297,16 +376,6 @@ impl Widget for Text {
 		// 		painter.fill_path(&builder.build(), Color::from(glyph_color.as_rgba()).to_linear());
 		// 	}
 		// }
-
-
-		// let text_color = ct::Color::rgb(0xFF, 0xFF, 0xFF);
-		// buffer.draw(&mut text_state.swash_cache, text_color, |x, y, w, h, color| {
-		// 	let pos = Vec2::new(x as f32 + 100.0, y as f32 + 300.0);
-		// 	let size = Vec2::new(w as f32 + 1.0, h as f32 + 1.0);
-		// 	let rect = Aabb2::new(pos, pos + size);
-
-		// 	painter.rect(rect, Color::from(color.as_rgba()).to_linear());
-		// });
 	}
 }
 

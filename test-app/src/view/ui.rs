@@ -121,7 +121,7 @@ impl StateBox {
 		self.0 = Some(Box::new(value));
 	}
 
-	pub fn get<T>(&mut self) -> &mut T
+	pub fn get_or_default<T>(&mut self) -> &mut T
 		where T: Default + 'static
 	{
 		// If we have a value but the type is wrong, reset it to default
@@ -133,8 +133,20 @@ impl StateBox {
 		unsafe {
 			// TODO(pat.m): this could use downcast_mut_unchecked once stable
 			self.0.as_mut()
+				.and_then(|value| value.downcast_mut::<T>())
 				.unwrap_unchecked()
-				.downcast_mut::<T>()
+		}
+	}
+
+	pub fn get<T>(&mut self) -> &mut T
+		where T: 'static
+	{
+		assert!(self.has::<T>());
+
+		unsafe {
+			// TODO(pat.m): this could use downcast_mut_unchecked once stable
+			self.0.as_mut()
+				.and_then(|value| value.downcast_mut::<T>())
 				.unwrap_unchecked()
 		}
 	}
@@ -300,64 +312,64 @@ impl<'ps> Ui<'ps> {
 			}
 		}
 
-		painter.set_clip_rect(to_4u16(&null_clip_rect));
 
 
 
+		// painter.set_clip_rect(to_4u16(&null_clip_rect));
 
-		let metrics = ct::Metrics::new(24.0, 32.0);
-		let mut buffer = ct::Buffer::new(&mut text_state.font_system, metrics);
-		{
-			let mut buffer = buffer.borrow_with(&mut text_state.font_system);
-			buffer.set_size(500.0, 80.0);
+		// let metrics = ct::Metrics::new(24.0, 32.0);
+		// let mut buffer = ct::Buffer::new(&mut text_state.font_system, metrics);
+		// {
+		// 	let mut buffer = buffer.borrow_with(&mut text_state.font_system);
+		// 	buffer.set_size(500.0, 80.0);
 
-			let attrs = ct::Attrs::new();
+		// 	let attrs = ct::Attrs::new();
 
-			buffer.set_text("Hello, Rust! 🦀 🐄🦐🅱 I'm emoting العربية ", attrs, ct::Shaping::Advanced);
-			buffer.shape_until_scroll(true);
-		}
+		// 	buffer.set_text("Hello, Rust! 🦀 🐄🦐🅱 I'm emoting العربية ", attrs, ct::Shaping::Advanced);
+		// 	buffer.shape_until_scroll(true);
+		// }
 
-		for run in buffer.layout_runs() {
-			for glyph in run.glyphs.iter() {
-				let physical_glyph = glyph.physical((0., 0.), 1.0);
+		// for run in buffer.layout_runs() {
+		// 	for glyph in run.glyphs.iter() {
+		// 		let physical_glyph = glyph.physical((0., 0.), 1.0);
 
-				let glyph_color = match glyph.color_opt {
-					Some(some) => some,
-					None => ct::Color::rgb(0xFF, 0x55, 0xFF),
-				};
+		// 		let glyph_color = match glyph.color_opt {
+		// 			Some(some) => some,
+		// 			None => ct::Color::rgb(0xFF, 0x55, 0xFF),
+		// 		};
 
-				let Some(commands) = text_state.swash_cache.get_outline_commands(&mut text_state.font_system, physical_glyph.cache_key)
-				else { continue };
+		// 		let Some(commands) = text_state.swash_cache.get_outline_commands(&mut text_state.font_system, physical_glyph.cache_key)
+		// 		else { continue };
 
-				let to_point = |[x, y]: [f32; 2]| {
-					lyon::math::Point::new(x + physical_glyph.x as f32 + 100.0, -y + physical_glyph.y as f32 + 300.0)
-				};
+		// 		let to_point = |[x, y]: [f32; 2]| {
+		// 			lyon::math::Point::new(x + physical_glyph.x as f32 + 100.0, -y + physical_glyph.y as f32 + 300.0)
+		// 		};
 
-				let mut builder = lyon::path::Path::builder().with_svg();
+		// 		let mut builder = lyon::path::Path::builder().with_svg();
 
-				for command in commands {
-					match *command {
-						ct::Command::MoveTo(p) => { builder.move_to(to_point(p.into())); }
-						ct::Command::LineTo(p) => { builder.line_to(to_point(p.into())); }
-						ct::Command::CurveTo(c1, c2, to) => { builder.cubic_bezier_to(to_point(c1.into()), to_point(c2.into()), to_point(to.into())); }
-						ct::Command::QuadTo(c, to) => { builder.quadratic_bezier_to(to_point(c.into()), to_point(to.into())); }
-						ct::Command::Close => { builder.close(); }
-					}
-				}
+		// 		for command in commands {
+		// 			match *command {
+		// 				ct::Command::MoveTo(p) => { builder.move_to(to_point(p.into())); }
+		// 				ct::Command::LineTo(p) => { builder.line_to(to_point(p.into())); }
+		// 				ct::Command::CurveTo(c1, c2, to) => { builder.cubic_bezier_to(to_point(c1.into()), to_point(c2.into()), to_point(to.into())); }
+		// 				ct::Command::QuadTo(c, to) => { builder.quadratic_bezier_to(to_point(c.into()), to_point(to.into())); }
+		// 				ct::Command::Close => { builder.close(); }
+		// 			}
+		// 		}
 
-				painter.fill_path(&builder.build(), Color::from(glyph_color.as_rgba()).to_linear());
-			}
-		}
+		// 		painter.fill_path(&builder.build(), Color::from(glyph_color.as_rgba()).to_linear());
+		// 	}
+		// }
 
 
-		// let text_color = ct::Color::rgb(0xFF, 0xFF, 0xFF);
-		// buffer.draw(&mut text_state.swash_cache, text_color, |x, y, w, h, color| {
-		// 	let pos = Vec2::new(x as f32 + 100.0, y as f32 + 300.0);
-		// 	let size = Vec2::new(w as f32 + 1.0, h as f32 + 1.0);
-		// 	let rect = Aabb2::new(pos, pos + size);
+		// // let text_color = ct::Color::rgb(0xFF, 0xFF, 0xFF);
+		// // buffer.draw(&mut text_state.swash_cache, text_color, |x, y, w, h, color| {
+		// // 	let pos = Vec2::new(x as f32 + 100.0, y as f32 + 300.0);
+		// // 	let size = Vec2::new(w as f32 + 1.0, h as f32 + 1.0);
+		// // 	let rect = Aabb2::new(pos, pos + size);
 
-		// 	painter.rect(rect, Color::from(color.as_rgba()).to_linear());
-		// });
+		// // 	painter.rect(rect, Color::from(color.as_rgba()).to_linear());
+		// // });
 	}
 }
 

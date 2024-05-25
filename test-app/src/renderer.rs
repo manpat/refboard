@@ -122,7 +122,7 @@ impl Renderer {
 				targets: &[Some(wgpu::ColorTargetState {
 					format: swapchain_format,
 					write_mask: wgpu::ColorWrites::all(),
-					blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+					blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
 				})],
 			}),
 			primitive: wgpu::PrimitiveState {
@@ -144,14 +144,14 @@ impl Renderer {
 
 		let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
 			label: None,
-			size: 1<<20,
+			size: 8<<20,
 			usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
 			mapped_at_creation: false,
 		});
 
 		let index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
 			label: None,
-			size: 1<<20,
+			size: 8<<20,
 			usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
 			mapped_at_creation: false,
 		});
