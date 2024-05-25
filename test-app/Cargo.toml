@@ -22,9 +22,11 @@ raw-window-handle = "0.6.0"
 
 common = { git = "https://github.com/manpat/common-rs.git", rev="911fd5e" }
 
-[target.'cfg(windows)'.dependencies]
-windows = { version = "0.54", features = ["Win32_UI_WindowsAndMessaging"] }
+cosmic-text = "0.11"
 
 # glyphon?
 # cosmic_text?
 # https://github.com/iced-rs/iced/blob/master/wgpu/src/text.rs
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.54", features = ["Win32_UI_WindowsAndMessaging"] }

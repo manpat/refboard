@@ -39,8 +39,8 @@ impl Painter {
 		self.geometry.vertices.clear();
 		self.geometry.indices.clear();
 
-		self.fill_options = FillOptions::tolerance(0.5).with_fill_rule(FillRule::NonZero);
-		self.stroke_options = StrokeOptions::tolerance(0.5);
+		self.fill_options = FillOptions::tolerance(0.1).with_fill_rule(FillRule::NonZero);
+		self.stroke_options = StrokeOptions::tolerance(0.1);
 
 		self.clip_rect = [0, u16::MAX, 0, u16::MAX];
 	}

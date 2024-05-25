@@ -52,6 +52,8 @@ impl View {
 					.with_constraints(|c| c.set_size_policy(ui::SizingBehaviour::FLEXIBLE))
 			);
 
+			ui.text("Hello, Rust! 🦀 🐄🦐🅱 I'm emoting العربية ");
+
 			let add_widget = |idx| {
 				let frame = ui.add_widget(ui::FrameWidget::horizontal().with_color(Color::green().with_alpha(0.2)));
 
@@ -106,8 +108,8 @@ impl View {
 				}
 
 				impl ui::Widget for Stateful {
-					fn draw(&self, painter: &mut Painter, layout: &ui::Layout, state: &mut ui::StateBox) {
-						let state = state.get::<StatefulState>();
+					fn draw(&self, ctx: ui::DrawContext<'_>) {
+						let state = ctx.state.get::<StatefulState>();
 
 						let color = match (state.active, state.hovered) {
 							(true, false) => Color::green(),
@@ -119,7 +121,7 @@ impl View {
 
 						ui::FrameWidget::horizontal()
 							.with_color(color)
-							.draw(painter, layout, &mut ui::StateBox::default());
+							.draw(ctx);
 					}
 				}
 

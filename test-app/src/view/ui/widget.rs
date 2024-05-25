@@ -12,6 +12,15 @@ pub struct ConstraintContext<'a> {
 	pub children: &'a [WidgetId],
 
 	pub state: &'a mut StateBox,
+	pub text_state: &'a mut super::TextState,
+}
+
+pub struct DrawContext<'a> {
+	pub painter: &'a mut Painter,
+	pub layout: &'a Layout,
+
+	pub state: &'a mut StateBox,
+	pub text_state: &'a mut super::TextState,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -21,14 +30,25 @@ pub enum WidgetLifecycleEvent {
 	Destroyed,
 }
 
+pub struct LifecycleContext<'a> {
+	pub event: WidgetLifecycleEvent,
+	pub state: &'a mut StateBox,
+	
+	pub text_state: &'a mut super::TextState,
+}
+
+
 pub trait Widget : AsAny + Debug {
 	fn constrain(&self, _: ConstraintContext<'_>) {}
-	fn draw(&self, _painter: &mut Painter, _layout: &Layout, _: &mut StateBox) {}
+	fn draw(&self, _: DrawContext<'_>) {}
 
-	fn lifecycle(&mut self, _event: WidgetLifecycleEvent, _state: &mut StateBox) {
-		if _event != WidgetLifecycleEvent::Updated {
+	fn lifecycle(&mut self, ctx: LifecycleContext<'_>) {
+		let event = ctx.event;
+		let state = ctx.state;
+
+		if event != WidgetLifecycleEvent::Updated {
 			let type_name = (*self).type_name();
-			println!("widget lifecycle {_event:?}: '{type_name}' ------ {_state:?}");
+			println!("widget lifecycle {event:?}: '{type_name}' ------ {state:?}");
 		}
 	}
 }

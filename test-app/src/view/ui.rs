@@ -17,14 +17,33 @@ use std::marker::PhantomData;
 // use std::hash::{DefaultHasher, Hasher, Hash};
 
 
+use cosmic_text as ct;
+
+
+#[derive(Debug)]
+pub struct TextState {
+	pub font_system: ct::FontSystem,
+	pub swash_cache: ct::SwashCache,
+}
+
+
 pub struct System {
 	persistent_state: PersistentState,
+	pub text_state: RefCell<TextState>,
 }
 
 impl System {
 	pub fn new() -> System {
+		let font_system = ct::FontSystem::new();
+		let swash_cache = ct::SwashCache::new();
+
 		System {
 			persistent_state: PersistentState::default(),
+
+			text_state: TextState {
+				font_system,
+				swash_cache,
+			}.into(),
 		}
 	}
 
@@ -34,7 +53,7 @@ impl System {
 
 		self.process_input(input);
 
-		let mut ui = Ui::new(&self.persistent_state, input);
+		let mut ui = Ui::new(&self.persistent_state, input, &self.text_state);
 
 		build_ui(&ui);
 
@@ -68,10 +87,17 @@ impl System {
 
 	fn garbage_collect(&self) {
 		let mut widgets = self.persistent_state.widgets.borrow_mut();
+		let mut text_state = self.text_state.borrow_mut();
+		let text_state = &mut *text_state;
+
 		self.persistent_state.hierarchy.borrow_mut()
 			.collect_stale_nodes(move |widget_id| {
 				if let Some(mut widget_state) = widgets.remove(&widget_id) {
-					widget_state.widget.lifecycle(WidgetLifecycleEvent::Destroyed, &mut widget_state.state);
+					widget_state.widget.lifecycle(LifecycleContext {
+						event: WidgetLifecycleEvent::Destroyed,
+						state: &mut widget_state.state,
+						text_state,
+					});
 				}
 			});
 	}
@@ -146,11 +172,12 @@ pub struct Ui<'ps> {
 	widget_layouts: LayoutMap,
 
 	persistent_state: &'ps PersistentState,
-	input: &'ps Input,
+	pub text_state: &'ps RefCell<TextState>,
+	pub input: &'ps Input,
 }
 
 impl<'ps> Ui<'ps> {
-	fn new(persistent_state: &'ps PersistentState, input: &'ps Input) -> Ui<'ps> {
+	fn new(persistent_state: &'ps PersistentState, input: &'ps Input, text_state: &'ps RefCell<TextState>) -> Ui<'ps> {
 		Ui {
 			stack: Default::default(),
 			widget_constraints: LayoutConstraintMap::default().into(),
@@ -158,6 +185,7 @@ impl<'ps> Ui<'ps> {
 			widget_layouts: LayoutMap::new(),
 
 			persistent_state,
+			text_state,
 			input,
 		}
 	}
@@ -166,6 +194,8 @@ impl<'ps> Ui<'ps> {
 		let hierarchy = self.persistent_state.hierarchy.borrow();
 		let mut widgets = self.persistent_state.widgets.borrow_mut();
 		let mut widget_constraints = self.widget_constraints.borrow_mut();
+		let mut text_state = self.text_state.borrow_mut();
+		let text_state = &mut *text_state;
 
 		let num_widgets = widgets.len();
 		widget_constraints.reserve(num_widgets);
@@ -182,6 +212,7 @@ impl<'ps> Ui<'ps> {
 				constraint_map: &mut widget_constraints,
 
 				state: &mut widget_state.state,
+				text_state,
 			});
 
 			widget_constraints.insert(widget_id, constraints);
@@ -227,6 +258,9 @@ impl<'ps> Ui<'ps> {
 		// TODO(pat.m): this is yucky - maybe we should actually calculate clip rects during layout?
 		// TODO(pat.m): also we may eventually want widgets to be able to ignore the parent clip rect
 
+		let mut text_state = self.text_state.borrow_mut();
+		let text_state = &mut *text_state;
+
 		// draw from root to leaves
 		let null_clip_rect = Aabb2::new(Vec2::zero(), Vec2::splat(u16::MAX as f32));
 		hierarchy.visit_breadth_first_with_parent_context(null_clip_rect, |widget_id, parent_clip| {
@@ -236,7 +270,13 @@ impl<'ps> Ui<'ps> {
 			let clip_rect = to_4u16(&parent_clip);
 
 			painter.set_clip_rect(clip_rect);
-			widget_state.widget.draw(painter, layout, &mut widget_state.state);
+			widget_state.widget.draw(DrawContext {
+				painter,
+				layout,
+				text_state,
+
+				state: &mut widget_state.state
+			});
 
 			painter.set_clip_rect(to_4u16(&null_clip_rect));
 			painter.rect_outline(parent_clip, Color::white());
@@ -259,6 +299,65 @@ impl<'ps> Ui<'ps> {
 				max: Vec2::new(lhs.max.x.min(rhs.max.x), lhs.max.y.min(rhs.max.y)),
 			}
 		}
+
+		painter.set_clip_rect(to_4u16(&null_clip_rect));
+
+
+
+
+		let metrics = ct::Metrics::new(24.0, 32.0);
+		let mut buffer = ct::Buffer::new(&mut text_state.font_system, metrics);
+		{
+			let mut buffer = buffer.borrow_with(&mut text_state.font_system);
+			buffer.set_size(500.0, 80.0);
+
+			let attrs = ct::Attrs::new();
+
+			buffer.set_text("Hello, Rust! 🦀 🐄🦐🅱 I'm emoting العربية ", attrs, ct::Shaping::Advanced);
+			buffer.shape_until_scroll(true);
+		}
+
+		for run in buffer.layout_runs() {
+			for glyph in run.glyphs.iter() {
+				let physical_glyph = glyph.physical((0., 0.), 1.0);
+
+				let glyph_color = match glyph.color_opt {
+					Some(some) => some,
+					None => ct::Color::rgb(0xFF, 0x55, 0xFF),
+				};
+
+				let Some(commands) = text_state.swash_cache.get_outline_commands(&mut text_state.font_system, physical_glyph.cache_key)
+				else { continue };
+
+				let to_point = |[x, y]: [f32; 2]| {
+					lyon::math::Point::new(x + physical_glyph.x as f32 + 100.0, -y + physical_glyph.y as f32 + 300.0)
+				};
+
+				let mut builder = lyon::path::Path::builder().with_svg();
+
+				for command in commands {
+					match *command {
+						ct::Command::MoveTo(p) => { builder.move_to(to_point(p.into())); }
+						ct::Command::LineTo(p) => { builder.line_to(to_point(p.into())); }
+						ct::Command::CurveTo(c1, c2, to) => { builder.cubic_bezier_to(to_point(c1.into()), to_point(c2.into()), to_point(to.into())); }
+						ct::Command::QuadTo(c, to) => { builder.quadratic_bezier_to(to_point(c.into()), to_point(to.into())); }
+						ct::Command::Close => { builder.close(); }
+					}
+				}
+
+				painter.fill_path(&builder.build(), Color::from(glyph_color.as_rgba()).to_linear());
+			}
+		}
+
+
+		// let text_color = ct::Color::rgb(0xFF, 0xFF, 0xFF);
+		// buffer.draw(&mut text_state.swash_cache, text_color, |x, y, w, h, color| {
+		// 	let pos = Vec2::new(x as f32 + 100.0, y as f32 + 300.0);
+		// 	let size = Vec2::new(w as f32 + 1.0, h as f32 + 1.0);
+		// 	let rect = Aabb2::new(pos, pos + size);
+
+		// 	painter.rect(rect, Color::from(color.as_rgba()).to_linear());
+		// });
 	}
 }
 
@@ -279,6 +378,8 @@ impl Ui<'_> {
 	{
 		let mut hierarchy = self.persistent_state.hierarchy.borrow_mut();
 		let mut widgets = self.persistent_state.widgets.borrow_mut();
+		let mut text_state = self.text_state.borrow_mut();
+		let text_state = &mut *text_state;
 
 		let parent_id = parent_id.into();
 		let type_id = TypeId::of::<T>();
@@ -296,23 +397,32 @@ impl Ui<'_> {
 					state: StateBox(None),
 				};
 
-				widget_box.widget.lifecycle(WidgetLifecycleEvent::Created, &mut widget_box.state);
+				widget_box.widget.lifecycle(LifecycleContext {
+					event: WidgetLifecycleEvent::Created,
+					state: &mut widget_box.state,
+					text_state,
+				});
+
 				widgets.insert(widget_id, widget_box);
 			}
 
 			NodeUpdateStatus::Update => {
-				let widget_state = widgets.get_mut(&widget_id).unwrap();
+				let widget_box = widgets.get_mut(&widget_id).unwrap();
 
 				// Reuse allocation if we can
-				if let Some(typed_widget) = widget_state.widget.as_widget_mut::<T>() {
+				if let Some(typed_widget) = widget_box.widget.as_widget_mut::<T>() {
 					*typed_widget = widget;
 				} else {
 					// Otherwise recreate storage
-					widget_state.widget = Box::new(widget);
+					widget_box.widget = Box::new(widget);
 					// TODO(pat.m): should this still be an update event?
 				}
 
-				widget_state.widget.lifecycle(WidgetLifecycleEvent::Updated, &mut widget_state.state);
+				widget_box.widget.lifecycle(LifecycleContext {
+					event: WidgetLifecycleEvent::Updated,
+					state: &mut widget_box.state,
+					text_state,
+				});
 			}
 		}
 
