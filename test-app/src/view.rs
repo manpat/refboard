@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-mod ui;
+pub mod ui;
 
 pub struct View {
 	// item view

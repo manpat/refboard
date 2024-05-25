@@ -11,6 +11,9 @@ pub struct Renderer {
 
 	framebuffer: wgpu::TextureView,
 
+	text_atlas_texture: wgpu::Texture,
+	text_atlas_texture_view: wgpu::TextureView,
+
 	globals_buffer: wgpu::Buffer,
 	vector_bind_group: wgpu::BindGroup,
 	vector_render_pipeline: wgpu::RenderPipeline,
@@ -84,6 +87,22 @@ impl Renderer {
 						has_dynamic_offset: false,
 						min_binding_size: wgpu::BufferSize::new(globals_buffer_byte_size),
 					},
+					count: None,
+				},
+				wgpu::BindGroupLayoutEntry {
+					binding: 1,
+					visibility: wgpu::ShaderStages::FRAGMENT,
+					ty: wgpu::BindingType::Texture {
+						sample_type: wgpu::TextureSampleType::Float{ filterable: false },
+						view_dimension: wgpu::TextureViewDimension::D2,
+						multisampled: false,
+					},
+					count: None,
+				},
+				wgpu::BindGroupLayoutEntry {
+					binding: 2,
+					visibility: wgpu::ShaderStages::FRAGMENT,
+					ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
 					count: None,
 				},
 			],
@@ -163,6 +182,33 @@ impl Renderer {
 			mapped_at_creation: false,
 		});
 
+		let text_atlas_texture = device.create_texture(&wgpu::TextureDescriptor {
+			label: Some("Text Atlas"),
+			size: wgpu::Extent3d {
+				// TODO(pat.m): should come from limits/TextState
+				width: 2048,
+				height: 2048,
+				depth_or_array_layers: 1,
+			},
+			mip_level_count: 1,
+			sample_count: 1,
+			dimension: wgpu::TextureDimension::D2,
+			format: wgpu::TextureFormat::Rgba8UnormSrgb,
+			usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
+			view_formats: &[wgpu::TextureFormat::Rgba8UnormSrgb]
+		});
+
+		let text_atlas_texture_view = text_atlas_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+		let atlas_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+			label: Some("Text Sampler"),
+			min_filter: wgpu::FilterMode::Nearest,
+			mag_filter: wgpu::FilterMode::Nearest,
+			mipmap_filter: wgpu::FilterMode::Nearest,
+
+			.. Default::default()
+		});
+
 		let vector_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
 			label: Some("Bind group"),
 			layout: &bind_group_layout,
@@ -171,10 +217,47 @@ impl Renderer {
 					binding: 0,
 					resource: wgpu::BindingResource::Buffer(globals_buffer.as_entire_buffer_binding()),
 				},
+				wgpu::BindGroupEntry {
+					binding: 1,
+					resource: wgpu::BindingResource::TextureView(&text_atlas_texture_view),
+				},
+				wgpu::BindGroupEntry {
+					binding: 2,
+					resource: wgpu::BindingResource::Sampler(&atlas_sampler),
+				},
 			],
 		});
 
 		let framebuffer = Self::create_framebuffer(&device, &surface_config, msaa_samples);
+
+		{
+			let image_copy = wgpu::ImageCopyTexture {
+				texture: &text_atlas_texture,
+				origin: wgpu::Origin3d {
+					x: text_atlas_texture.width() - 1,
+					y: text_atlas_texture.height() - 1,
+					z: 0,
+				},
+
+				mip_level: 0,
+				aspect: wgpu::TextureAspect::All,
+			};
+
+			let data_layout = wgpu::ImageDataLayout {
+				offset: 0,
+				bytes_per_row: None,
+				rows_per_image: None,
+			};
+
+			let size = wgpu::Extent3d {
+				width: 1,
+				height: 1,
+				depth_or_array_layers: 1,
+			};
+
+			// Write single white pixel for non-textured geometry
+			queue.write_texture(image_copy, &[255; 4], data_layout, size);
+		}
 
 		Ok(Renderer {
 			device,
@@ -187,6 +270,9 @@ impl Renderer {
 			vector_render_pipeline,
 
 			framebuffer,
+
+			text_atlas_texture,
+			text_atlas_texture_view,
 
 			vertex_buffer,
 			index_buffer,
@@ -231,7 +317,7 @@ impl Renderer {
 		}
 	}
 
-	pub fn prepare(&mut self, painter: &Painter, viewport: &view::Viewport, text_state: &mut TextState) {
+	pub fn prepare(&mut self, painter: &Painter, viewport: &view::Viewport, text_state: &mut crate::view::ui::TextState) {
 		let vertex_bytes = bytemuck::cast_slice(&painter.geometry.vertices);
 		let index_bytes = bytemuck::cast_slice(&painter.geometry.indices);
 

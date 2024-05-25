@@ -93,7 +93,7 @@ async fn main() -> anyhow::Result<()> {
 		match event {
 			// Initial present/show window
 			Event::NewEvents(StartCause::Init) => {
-				renderer.prepare(&painter, &view.viewport, &mut view.ui.text_state);
+				renderer.prepare(&painter, &view.viewport, &mut *view.ui.text_state.borrow_mut());
 
 				window.pre_present_notify();
 				renderer.present();
@@ -109,7 +109,7 @@ async fn main() -> anyhow::Result<()> {
 
 						painter.clear();
 						view.paint(&mut painter, &app);
-						renderer.prepare(&painter, &view.viewport, &mut view.ui.text_state);
+						renderer.prepare(&painter, &view.viewport, &mut *view.ui.text_state.borrow_mut());
 
 						window.pre_present_notify();
 						renderer.present();
