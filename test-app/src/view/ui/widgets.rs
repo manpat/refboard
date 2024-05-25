@@ -309,6 +309,9 @@ impl Widget for Text {
 		for run in state.buffer.layout_runs() {
 			for glyph in run.glyphs.iter() {
 				let physical_glyph = glyph.physical(start_pos.to_tuple(), 1.0);
+
+				// TODO(pat.m): check local cache first - otherwise stage returned image for text atlas upload
+				// text_state.glyph_info(physical_glyph.cache_key)
 				let Some(image) = ctx.text_state.swash_cache.get_image(font_system, physical_glyph.cache_key)
 					else { continue };
 

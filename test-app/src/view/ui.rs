@@ -24,6 +24,8 @@ use cosmic_text as ct;
 pub struct TextState {
 	pub font_system: ct::FontSystem,
 	pub swash_cache: ct::SwashCache,
+
+	// TODO(pat.m): text atlas
 }
 
 
@@ -290,8 +292,9 @@ impl<'ps> Ui<'ps> {
 				state: &mut widget_state.state
 			});
 
-			painter.set_clip_rect(to_4u16(&null_clip_rect));
-			painter.rect_outline(parent_clip, Color::white());
+			// Visualise clip rects
+			// painter.set_clip_rect(to_4u16(&null_clip_rect));
+			// painter.rect_outline(parent_clip, Color::white());
 
 			clip_rects(&layout.box_bounds, &parent_clip)
 		});

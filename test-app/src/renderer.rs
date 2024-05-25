@@ -231,7 +231,7 @@ impl Renderer {
 		}
 	}
 
-	pub fn prepare(&mut self, painter: &Painter, viewport: &view::Viewport) {
+	pub fn prepare(&mut self, painter: &Painter, viewport: &view::Viewport, text_state: &mut TextState) {
 		let vertex_bytes = bytemuck::cast_slice(&painter.geometry.vertices);
 		let index_bytes = bytemuck::cast_slice(&painter.geometry.indices);
 
@@ -249,6 +249,10 @@ impl Renderer {
 				row_y: [ basis_x.y, basis_y.y, 0.0, translation.y],
 			}
 		]));
+
+		// for each glyph update in text_state, queue a texture update for text atlas
+
+		// clear glyph atlasses
 	}
 
 	pub fn present(&mut self) {
@@ -277,7 +281,7 @@ impl Renderer {
 						view: &current_frame_view,
 						resolve_target: None,
 						ops: wgpu::Operations {
-							load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+							load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
 							store: wgpu::StoreOp::Store,
 						},
 					}
@@ -286,7 +290,7 @@ impl Renderer {
 						view: &self.framebuffer,
 						resolve_target: Some(&current_frame_view),
 						ops: wgpu::Operations {
-							load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+							load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
 							store: wgpu::StoreOp::Store,
 						},
 					}
