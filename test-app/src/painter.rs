@@ -49,14 +49,14 @@ impl Painter {
 	{
 		let color = color.into().to_array();
 		f(&mut self.stroke_tess, &self.stroke_options,
-			&mut BuffersBuilder::new(&mut self.geometry, VertexConstructor { color, clip_rect: self.clip_rect }) );
+			&mut BuffersBuilder::new(&mut self.geometry, VertexConstructor::new(color, self.clip_rect)) );
 	}
 
 	fn with_filler(&mut self, color: impl Into<Color>, f: impl FnOnce(&mut FillTessellator, &FillOptions, &mut BuffersBuilder<'_, renderer::Vertex, u32, VertexConstructor>))
 	{
 		let color = color.into().to_array();
 		f(&mut self.fill_tess, &self.fill_options,
-			&mut BuffersBuilder::new(&mut self.geometry, VertexConstructor { color, clip_rect: self.clip_rect }) );
+			&mut BuffersBuilder::new(&mut self.geometry, VertexConstructor::new(color, self.clip_rect)) );
 	}
 }
 
@@ -177,14 +177,35 @@ impl IntoBorderRadii for BorderRadii {
 struct VertexConstructor {
 	color: [f32; 4],
 	clip_rect: [u16; 4],
+	uv_rect: Option<Aabb2>,
+
+	total_rect: Aabb2,
+}
+
+impl VertexConstructor {
+	fn new(color: impl Into<Color>, clip_rect: [u16; 4]) -> Self {
+		VertexConstructor {
+			color: color.into().into(),
+			clip_rect,
+			uv_rect: None,
+			total_rect: Aabb2::empty(),
+		}
+	}
 }
 
 impl FillVertexConstructor<renderer::Vertex> for VertexConstructor {
 	fn new_vertex(&mut self, vertex: FillVertex) -> renderer::Vertex {
 		let pos = vertex.position().to_array();
+		self.total_rect.min.x = self.total_rect.min.x.min(pos[0]);
+		self.total_rect.max.x = self.total_rect.max.x.max(pos[0]);
+		self.total_rect.min.y = self.total_rect.min.y.min(pos[1]);
+		self.total_rect.max.y = self.total_rect.max.y.max(pos[1]);
+		// TODO(pat.m): use total_rect + uv_rect to calculate uvs for primitive
+		// or maybe these can be stored in a primitive buffer?
 		renderer::Vertex {
 			pos,
 			color: self.color,
+			uv: [1.0, 1.0],
 			clip_rect: self.clip_rect,
 		}
 	}
@@ -196,6 +217,7 @@ impl StrokeVertexConstructor<renderer::Vertex> for VertexConstructor {
 		renderer::Vertex {
 			pos,
 			color: self.color,
+			uv: [1.0, 1.0],
 			clip_rect: self.clip_rect,
 		}
 	}

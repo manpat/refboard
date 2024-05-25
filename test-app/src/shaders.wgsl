@@ -6,7 +6,8 @@ struct Globals {
 struct VertexInput {
     @location(0) position: vec2f,
     @location(1) color: vec4f,
-    @location(2) clip_rect: vec4u,
+    @location(2) uv: vec2f,
+    @location(3) clip_rect: vec4u,
 };
 
 struct VertexOutput {
@@ -29,13 +30,11 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     // Premultiply vertex color
     let color = vertex.color;
     let color_premul = vec4f(color.rgb * color.a, color.a);
-
-    let uv = vec2f(1.0, 1.0);
-
+    
     return VertexOutput(
         color_premul,
         vertex.clip_rect,
-        uv,
+        vertex.uv,
         vec4f(clip_position, 0.5, 1.0)
     );
 }

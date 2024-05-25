@@ -25,6 +25,8 @@ pub struct TextState {
 	pub font_system: ct::FontSystem,
 	pub swash_cache: ct::SwashCache,
 
+	// pub
+
 	// TODO(pat.m): text atlas
 }
 
