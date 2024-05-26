@@ -311,34 +311,39 @@ impl Widget for Text {
 		let start_pos = ctx.layout.content_bounds.min;
 		state.buffer.set_size(font_system, size.x, size.y);
 
-		// for run in state.buffer.layout_runs() {
-		// 	for glyph in run.glyphs.iter() {
-		// 		let physical_glyph = glyph.physical(start_pos.to_tuple(), 1.0);
+		// let (r, g, b, a) = self.color.to_srgb().to_byte_tuple();
+		// let text_color = ct::Color::rgba(r, g, b, a);
 
-		// 		// TODO(pat.m): check local cache first - otherwise stage returned image for text atlas upload
-		// 		// text_state.glyph_info(physical_glyph.cache_key)
-		// 		let Some(image) = ctx.text_state.swash_cache.get_image(font_system, physical_glyph.cache_key)
-		// 			else { continue };
+		for run in state.buffer.layout_runs() {
+			for glyph in run.glyphs.iter() {
+				let physical_glyph = glyph.physical(start_pos.to_tuple(), 1.0);
 
-		// 		let placement = image.placement;
+				let glyph_info = ctx.text_state.request_glyph(&physical_glyph.cache_key);
 
-		// 		let pos = Vec2::new(physical_glyph.x as f32 + placement.left as f32, physical_glyph.y as f32 - placement.top as f32 + run.line_y);
-		// 		let size = Vec2::new(placement.width as f32, placement.height as f32);
-		// 		let bounds = Aabb2::new(pos, pos + size);
-		// 		ctx.painter.rect_outline(bounds, Color::grey_a(0.5, 0.1));
-		// 	}
-		// }
+				// TODO(pat.m): check local cache first - otherwise stage returned image for text atlas upload
+				// text_state.glyph_info(physical_glyph.cache_key)
+				// let Some(image) = ctx.text_state.swash_cache.get_image(font_system, physical_glyph.cache_key)
+				// 	else { continue };
 
-		let (r, g, b, a) = self.color.to_srgb().to_byte_tuple();
-		let text_color = ct::Color::rgba(r, g, b, a);
+				// let placement = image.placement;
 
-		state.buffer.draw(font_system, &mut ctx.text_state.swash_cache, text_color, |x, y, w, h, color| {
-			let pos = Vec2::new(x as f32, y as f32) + start_pos;
-			let size = Vec2::new(w as f32, h as f32);
-			let rect = Aabb2::new(pos, pos + size);
+				let pos = Vec2::new(physical_glyph.x as f32 + glyph_info.offset_x, physical_glyph.y as f32 + glyph_info.offset_y + run.line_y);
+				let uv_pos = Vec2::new(glyph_info.uv_x, glyph_info.uv_y);
+				let size = Vec2::new(glyph_info.width, glyph_info.height);
+				let bounds = Aabb2::new(pos, pos + size);
+				let _uv_bounds = Aabb2::new(uv_pos, uv_pos + size);
+				ctx.painter.rect_outline(bounds, self.color);
+			}
+		}
 
-			ctx.painter.rect(rect, Color::from(color.as_rgba()).to_linear());
-		});
+
+		// state.buffer.draw(font_system, &mut ctx.text_state.swash_cache, text_color, |x, y, w, h, color| {
+		// 	let pos = Vec2::new(x as f32, y as f32) + start_pos;
+		// 	let size = Vec2::new(w as f32, h as f32);
+		// 	let rect = Aabb2::new(pos, pos + size);
+
+		// 	ctx.painter.rect(rect, Color::from(color.as_rgba()).to_linear());
+		// });
 
 		// let mut text_state = self.text_state.borrow_mut();
 		// let text_state = &mut *text_state;

@@ -357,9 +357,44 @@ impl Renderer {
 			}
 		]));
 
-		// for each glyph update in text_state, queue a texture update for text atlas
+		for crate::view::ui::GlyphUpdate{image, dst_pos} in text_state.glyph_updates.drain(..) {
+			let placement = image.placement;
 
-		// clear glyph atlasses
+			let mut data = image.data;
+
+			if image.content == cosmic_text::SwashContent::Mask {
+				data = data.into_iter()
+					// TODO(pat.m): premultiply?
+					.flat_map(|alpha| [255, 255, 255, alpha])
+					.collect();
+			}
+
+			let image_copy = wgpu::ImageCopyTexture {
+				texture: &self.text_atlas_texture,
+				origin: wgpu::Origin3d {
+					x: dst_pos.x as u32,
+					y: dst_pos.y as u32,
+					z: 0,
+				},
+
+				mip_level: 0,
+				aspect: wgpu::TextureAspect::All,
+			};
+
+			let data_layout = wgpu::ImageDataLayout {
+				offset: 0,
+				bytes_per_row: Some(placement.width * 4),
+				rows_per_image: None,
+			};
+
+			let size = wgpu::Extent3d {
+				width: placement.width,
+				height: placement.height,
+				depth_or_array_layers: 1,
+			};
+
+			self.queue.write_texture(image_copy, &data, data_layout, size);
+		}
 	}
 
 	pub fn present(&mut self) {
