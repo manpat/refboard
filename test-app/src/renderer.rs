@@ -56,7 +56,8 @@ impl Renderer {
 		let (device, queue) = adapter.request_device(
 			&wgpu::DeviceDescriptor {
 				label: None,
-				required_features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
+				required_features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES
+					| wgpu::Features::DUAL_SOURCE_BLENDING,
 				required_limits: wgpu::Limits::default(),
 			},
 			None,
@@ -93,7 +94,7 @@ impl Renderer {
 					binding: 1,
 					visibility: wgpu::ShaderStages::FRAGMENT,
 					ty: wgpu::BindingType::Texture {
-						sample_type: wgpu::TextureSampleType::Float{ filterable: false },
+						sample_type: wgpu::TextureSampleType::Float{ filterable: true },
 						view_dimension: wgpu::TextureViewDimension::D2,
 						multisampled: false,
 					},
@@ -102,7 +103,7 @@ impl Renderer {
 				wgpu::BindGroupLayoutEntry {
 					binding: 2,
 					visibility: wgpu::ShaderStages::FRAGMENT,
-					ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+					ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
 					count: None,
 				},
 			],
@@ -122,6 +123,21 @@ impl Renderer {
 
 		println!("Using MSAA x{msaa_samples}");
 
+		// Premultiplied dual-source blending
+		let blend_state = wgpu::BlendState {
+			color: wgpu::BlendComponent {
+				src_factor: wgpu::BlendFactor::One,
+				dst_factor: wgpu::BlendFactor::OneMinusSrc1,
+				operation: wgpu::BlendOperation::Add,
+			},
+			alpha: wgpu::BlendComponent {
+				src_factor: wgpu::BlendFactor::One,
+				dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+				operation: wgpu::BlendOperation::Add,
+			},
+		};
+
+		// let blend_state = wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING;
 
 		let vector_render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
 			label: None,
@@ -146,7 +162,7 @@ impl Renderer {
 				targets: &[Some(wgpu::ColorTargetState {
 					format: swapchain_format,
 					write_mask: wgpu::ColorWrites::all(),
-					blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
+					blend: Some(blend_state),
 				})],
 			}),
 			primitive: wgpu::PrimitiveState {
@@ -207,8 +223,8 @@ impl Renderer {
 
 		let atlas_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
 			label: Some("Text Sampler"),
-			min_filter: wgpu::FilterMode::Nearest,
-			mag_filter: wgpu::FilterMode::Nearest,
+			min_filter: wgpu::FilterMode::Linear,
+			mag_filter: wgpu::FilterMode::Linear,
 			mipmap_filter: wgpu::FilterMode::Nearest,
 
 			.. Default::default()

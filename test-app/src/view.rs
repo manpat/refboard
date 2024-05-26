@@ -53,8 +53,12 @@ impl View {
 			);
 
 			ui.text("Hello, Rust! 🦀 🐄🦐🅱\nI'm emoting العربية ");
-			ui.text("Now I have a text widget lol lmao")
-				.with_constraints(|c| c.self_alignment.set(ui::Align::End));
+
+			ui.with_parent_widget(ui::FrameWidget::horizontal().with_color(Color::white()), || {
+				ui.text("Now I have a text widget lol lmao")
+					.with_widget(|w, _| w.color = Color::grey(0.02));
+			})
+			.with_constraints(|c| c.self_alignment.set(ui::Align::End));
 
 			ui.text("Now I'm centre aligned")
 				.with_constraints(|c| c.self_alignment.set(ui::Align::Middle));

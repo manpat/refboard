@@ -20,7 +20,10 @@ impl Ui<'_> {
 	}
 
 	pub fn text(&self, s: impl Into<String>) -> WidgetRef<'_, Text> {
-		self.add_widget(Text(s.into()))
+		self.add_widget(Text {
+			text: s.into(),
+			color: Color::white(),
+		})
 	}
 }
 
@@ -233,7 +236,10 @@ const HACK_LINE_HEIGHT: f32 = 40.0;
 
 
 #[derive(Debug)]
-pub struct Text(pub String);
+pub struct Text {
+	pub text: String,
+	pub color: Color,
+}
 
 #[derive(Debug)]
 struct TextState {
@@ -265,7 +271,7 @@ impl Widget for Text {
 		// }
 
 		let attrs = cosmic_text::Attrs::new();
-		buffer.set_text(&self.0, attrs, cosmic_text::Shaping::Advanced);
+		buffer.set_text(&self.text, attrs, cosmic_text::Shaping::Advanced);
 	}
 
 	fn constrain(&self, ctx: ConstraintContext<'_>) {
@@ -323,7 +329,9 @@ impl Widget for Text {
 		// 	}
 		// }
 
-		let text_color = ct::Color::rgb(0xff, 0xff, 0xff);
+		let (r, g, b, a) = self.color.to_srgb().to_byte_tuple();
+		let text_color = ct::Color::rgba(r, g, b, a);
+
 		state.buffer.draw(font_system, &mut ctx.text_state.swash_cache, text_color, |x, y, w, h, color| {
 			let pos = Vec2::new(x as f32, y as f32) + start_pos;
 			let size = Vec2::new(w as f32, h as f32);
