@@ -255,8 +255,8 @@ impl Renderer {
 			let image_copy = wgpu::ImageCopyTexture {
 				texture: &text_atlas_texture,
 				origin: wgpu::Origin3d {
-					x: text_atlas_texture.width() - 1,
-					y: text_atlas_texture.height() - 1,
+					x: text_atlas_texture.width() - 4,
+					y: text_atlas_texture.height() - 4,
 					z: 0,
 				},
 
@@ -266,18 +266,18 @@ impl Renderer {
 
 			let data_layout = wgpu::ImageDataLayout {
 				offset: 0,
-				bytes_per_row: None,
+				bytes_per_row: Some(4*4),
 				rows_per_image: None,
 			};
 
 			let size = wgpu::Extent3d {
-				width: 1,
-				height: 1,
+				width: 4,
+				height: 4,
 				depth_or_array_layers: 1,
 			};
 
 			// Write single white pixel for non-textured geometry
-			queue.write_texture(image_copy, &[255; 4], data_layout, size);
+			queue.write_texture(image_copy, &[255; 4 * 16], data_layout, size);
 		}
 
 		Ok(Renderer {

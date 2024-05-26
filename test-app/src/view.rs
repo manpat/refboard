@@ -52,11 +52,11 @@ impl View {
 					.with_constraints(|c| c.set_size_policy(ui::SizingBehaviour::FLEXIBLE))
 			);
 
-			ui.text("Hello, Rust! 🦀 🐄🦐🅱\nI'm emoting العربية ");
+			ui.text("Hello, Rust! 🦀🐄🦐🅱\nI'm emoting العربية ");
 
 			ui.with_parent_widget(ui::FrameWidget::horizontal().with_color(Color::white()), || {
-				ui.text("Now I have a text widget lol lmao")
-					.with_widget(|w, _| w.color = Color::grey(0.02));
+				ui.text("White bg color🦀🐄🦐🅱")
+					.with_widget(|w, _| w.color = Color::black());
 			})
 			.with_constraints(|c| c.self_alignment.set(ui::Align::End));
 
@@ -182,7 +182,8 @@ impl View {
 
 		// Cursor
 		if let Some(cursor_pos) = self.input.cursor_pos_view {
-			painter.circle(cursor_pos, 3.0, [1.0, 0.0, 0.0]);
+			painter.set_color([1.0, 0.0, 0.0]);
+			painter.circle(cursor_pos, 3.0);
 		}
 	}
 

@@ -38,12 +38,13 @@ impl Widget for () {
 	}
 
 	fn draw(&self, ctx: DrawContext<'_>) {
-		let widget_color = [0.5; 3];
-		ctx.painter.rounded_rect_outline(ctx.layout.box_bounds, 8.0, widget_color);
-		ctx.painter.line(ctx.layout.box_bounds.min, ctx.layout.box_bounds.max, widget_color);
-		ctx.painter.line(ctx.layout.box_bounds.min_max_corner(), ctx.layout.box_bounds.max_min_corner(), widget_color);
+		ctx.painter.set_color([0.5; 3]);
+		ctx.painter.rounded_rect_outline(ctx.layout.box_bounds, 8.0);
+		ctx.painter.line(ctx.layout.box_bounds.min, ctx.layout.box_bounds.max);
+		ctx.painter.line(ctx.layout.box_bounds.min_max_corner(), ctx.layout.box_bounds.max_min_corner());
 
-		ctx.painter.rounded_rect_outline(ctx.layout.content_bounds, 8.0, [0.5, 1.0, 0.5, 0.5]);
+		ctx.painter.set_color([0.5, 1.0, 0.5, 0.5]);
+		ctx.painter.rounded_rect_outline(ctx.layout.content_bounds, 8.0);
 	}
 }
 
@@ -184,8 +185,11 @@ impl<W> Widget for FrameWidget<W>
 	fn draw(&self, ctx: DrawContext<'_>) {
 		let rounding = 4.0;
 
-		ctx.painter.rounded_rect(ctx.layout.box_bounds, rounding, self.background_color);
-		ctx.painter.rounded_rect_outline(ctx.layout.box_bounds, rounding, self.outline_color);
+		ctx.painter.set_color(self.background_color);
+		ctx.painter.rounded_rect(ctx.layout.box_bounds, rounding);
+
+		ctx.painter.set_color(self.outline_color);
+		ctx.painter.rounded_rect_outline(ctx.layout.box_bounds, rounding);
 
 		self.inner.draw(ctx);
 	}
@@ -222,16 +226,19 @@ impl Widget for Button {
 	fn draw(&self, ctx: DrawContext<'_>) {
 		let rounding = 4.0;
 
-		ctx.painter.rounded_rect(ctx.layout.box_bounds, rounding, Color::grey(0.3));
-		ctx.painter.rounded_rect_outline(ctx.layout.box_bounds, rounding, Color::grey(0.5));
+		ctx.painter.set_color(Color::grey(0.3));
+		ctx.painter.rounded_rect(ctx.layout.box_bounds, rounding);
+
+		ctx.painter.set_color(Color::grey(0.5));
+		ctx.painter.rounded_rect_outline(ctx.layout.box_bounds, rounding);
 	}
 }
 
 
 
 // TODO(pat.m): more dynamic
-const HACK_FONT_SIZE: f32 = 32.0;
-const HACK_LINE_HEIGHT: f32 = 40.0;
+const HACK_FONT_SIZE: f32 = 16.0;
+const HACK_LINE_HEIGHT: f32 = HACK_FONT_SIZE; // 24.0;
 
 
 
@@ -303,39 +310,43 @@ impl Widget for Text {
 	fn draw(&self, ctx: DrawContext<'_>) {
 		let state = ctx.state.get::<TextState>();
 
-		ctx.painter.rect_outline(ctx.layout.box_bounds, Color::grey_a(0.5, 0.1));
-
 		let font_system = &mut ctx.text_state.font_system;
 
 		let size = ctx.layout.content_bounds.size();
 		let start_pos = ctx.layout.content_bounds.min;
 		state.buffer.set_size(font_system, size.x, size.y);
 
-		// let (r, g, b, a) = self.color.to_srgb().to_byte_tuple();
-		// let text_color = ct::Color::rgba(r, g, b, a);
-
 		for run in state.buffer.layout_runs() {
 			for glyph in run.glyphs.iter() {
 				let physical_glyph = glyph.physical(start_pos.to_tuple(), 1.0);
 
 				let glyph_info = ctx.text_state.request_glyph(&physical_glyph.cache_key);
-
-				// TODO(pat.m): check local cache first - otherwise stage returned image for text atlas upload
-				// text_state.glyph_info(physical_glyph.cache_key)
-				// let Some(image) = ctx.text_state.swash_cache.get_image(font_system, physical_glyph.cache_key)
-				// 	else { continue };
-
-				// let placement = image.placement;
+				// TODO(pat.m): pass glyph_info.subpixel_alpha down to painter
 
 				let pos = Vec2::new(physical_glyph.x as f32 + glyph_info.offset_x, physical_glyph.y as f32 + glyph_info.offset_y + run.line_y);
 				let uv_pos = Vec2::new(glyph_info.uv_x, glyph_info.uv_y);
 				let size = Vec2::new(glyph_info.width, glyph_info.height);
 				let bounds = Aabb2::new(pos, pos + size);
-				let _uv_bounds = Aabb2::new(uv_pos, uv_pos + size);
-				ctx.painter.rect_outline(bounds, self.color);
+
+				let atlas_size = Vec2::splat(2048.0);
+				let uv_bounds = Aabb2::new(uv_pos / atlas_size, (uv_pos + size) / atlas_size);
+
+				let glyph_color = match (glyph.color_opt, glyph_info.is_color_bitmap) {
+					(_, true) => Color::white(),
+					(Some(ct_color), _) => Color::from(ct_color.as_rgba()).to_linear(),
+					(None, _) => self.color,
+				};
+
+				ctx.painter.set_color(glyph_color);
+				ctx.painter.set_uv_rect(uv_bounds);
+				ctx.painter.rect(bounds);
 			}
 		}
 
+		ctx.painter.set_uv_rect(None);
+
+		// let (r, g, b, a) = self.color.to_srgb().to_byte_tuple();
+		// let text_color = ct::Color::rgba(r, g, b, a);
 
 		// state.buffer.draw(font_system, &mut ctx.text_state.swash_cache, text_color, |x, y, w, h, color| {
 		// 	let pos = Vec2::new(x as f32, y as f32) + start_pos;
@@ -344,53 +355,6 @@ impl Widget for Text {
 
 		// 	ctx.painter.rect(rect, Color::from(color.as_rgba()).to_linear());
 		// });
-
-		// let mut text_state = self.text_state.borrow_mut();
-		// let text_state = &mut *text_state;
-
-		// let metrics = ct::Metrics::new(24.0, 32.0);
-		// let mut buffer = ct::Buffer::new(&mut text_state.font_system, metrics);
-		// {
-		// 	let mut buffer = buffer.borrow_with(&mut text_state.font_system);
-		// 	buffer.set_size(500.0, 80.0);
-
-		// 	let attrs = ct::Attrs::new();
-
-		// 	buffer.set_text("Hello, Rust! 🦀 🐄🦐🅱 I'm emoting العربية ", attrs, ct::Shaping::Advanced);
-		// 	buffer.shape_until_scroll(true);
-		// }
-
-		// for run in buffer.layout_runs() {
-		// 	for glyph in run.glyphs.iter() {
-		// 		let physical_glyph = glyph.physical((0., 0.), 1.0);
-
-		// 		let glyph_color = match glyph.color_opt {
-		// 			Some(some) => some,
-		// 			None => ct::Color::rgb(0xFF, 0x55, 0xFF),
-		// 		};
-
-		// 		let Some(commands) = text_state.swash_cache.get_outline_commands(&mut text_state.font_system, physical_glyph.cache_key)
-		// 		else { continue };
-
-		// 		let to_point = |[x, y]: [f32; 2]| {
-		// 			lyon::math::Point::new(x + physical_glyph.x as f32 + 100.0, -y + physical_glyph.y as f32 + 300.0)
-		// 		};
-
-		// 		let mut builder = lyon::path::Path::builder().with_svg();
-
-		// 		for command in commands {
-		// 			match *command {
-		// 				ct::Command::MoveTo(p) => { builder.move_to(to_point(p.into())); }
-		// 				ct::Command::LineTo(p) => { builder.line_to(to_point(p.into())); }
-		// 				ct::Command::CurveTo(c1, c2, to) => { builder.cubic_bezier_to(to_point(c1.into()), to_point(c2.into()), to_point(to.into())); }
-		// 				ct::Command::QuadTo(c, to) => { builder.quadratic_bezier_to(to_point(c.into()), to_point(to.into())); }
-		// 				ct::Command::Close => { builder.close(); }
-		// 			}
-		// 		}
-
-		// 		painter.fill_path(&builder.build(), Color::from(glyph_color.as_rgba()).to_linear());
-		// 	}
-		// }
 	}
 }
 

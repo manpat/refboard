@@ -16,6 +16,8 @@ pub struct Painter {
 
 	scratch_path: PathBuffer,
 
+	color: Color,
+	uv_rect: Option<Aabb2>,
 	clip_rect: [u16; 4],
 }
 
@@ -31,6 +33,8 @@ impl Painter {
 
 			scratch_path: PathBuffer::new(),
 
+			color: Color::white(),
+			uv_rect: None,
 			clip_rect: [0, u16::MAX, 0, u16::MAX],
 		}
 	}
@@ -42,21 +46,66 @@ impl Painter {
 		self.fill_options = FillOptions::tolerance(0.1).with_fill_rule(FillRule::NonZero);
 		self.stroke_options = StrokeOptions::tolerance(0.1);
 
+		self.color = Color::white();
+		self.uv_rect = None;
 		self.clip_rect = [0, u16::MAX, 0, u16::MAX];
 	}
 
-	fn with_stroker(&mut self, color: impl Into<Color>, f: impl FnOnce(&mut StrokeTessellator, &StrokeOptions, &mut BuffersBuilder<'_, renderer::Vertex, u32, VertexConstructor>))
+	fn with_stroker(&mut self, f: impl FnOnce(&mut StrokeTessellator, &StrokeOptions, &mut BuffersBuilder<'_, renderer::Vertex, u32, VertexConstructor>))
 	{
-		let color = color.into().to_array();
-		f(&mut self.stroke_tess, &self.stroke_options,
-			&mut BuffersBuilder::new(&mut self.geometry, VertexConstructor::new(color, self.clip_rect)) );
+		let num_initial_verts = self.geometry.vertices.len();
+		let mut bounds = Aabb2::empty();
+
+		let mut vertex_constructor = VertexConstructor::new(self.color, self.clip_rect);
+		if self.uv_rect.is_some() {
+			vertex_constructor.total_rect = Some(&mut bounds);
+		}
+
+		f(&mut self.stroke_tess, &self.stroke_options, &mut BuffersBuilder::new(&mut self.geometry, vertex_constructor));
+
+		if let Some(dst_rect) = self.uv_rect {
+			let src_pos = bounds.min;
+			let src_size = bounds.size();
+
+			let dst_pos = dst_rect.min;
+			let dst_size = dst_rect.size();
+
+			for vertex in &mut self.geometry.vertices[num_initial_verts..] {
+				let normalised = (Vec2::from(vertex.pos) - src_pos) / src_size;
+				let uv = normalised * dst_size + dst_pos;
+				vertex.uv = uv.into();
+			}
+		}
 	}
 
-	fn with_filler(&mut self, color: impl Into<Color>, f: impl FnOnce(&mut FillTessellator, &FillOptions, &mut BuffersBuilder<'_, renderer::Vertex, u32, VertexConstructor>))
+	fn with_filler(&mut self, f: impl FnOnce(&mut FillTessellator, &FillOptions, &mut BuffersBuilder<'_, renderer::Vertex, u32, VertexConstructor>))
 	{
-		let color = color.into().to_array();
-		f(&mut self.fill_tess, &self.fill_options,
-			&mut BuffersBuilder::new(&mut self.geometry, VertexConstructor::new(color, self.clip_rect)) );
+		let num_initial_verts = self.geometry.vertices.len();
+		let mut bounds = Aabb2::empty();
+
+		let mut vertex_constructor = VertexConstructor::new(self.color, self.clip_rect);
+		if self.uv_rect.is_some() {
+			vertex_constructor.total_rect = Some(&mut bounds);
+		}
+
+		f(&mut self.fill_tess, &self.fill_options, &mut BuffersBuilder::new(&mut self.geometry, vertex_constructor));
+
+		// Fix up uvs if necessary
+		if let Some(dst_rect) = self.uv_rect {
+			let src_pos = bounds.min;
+			let src_size = bounds.size();
+
+			let dst_pos = dst_rect.min;
+			let dst_size = dst_rect.size();
+
+			let scale = dst_size / src_size;
+			let offset = dst_pos - src_pos * scale;
+
+			for vertex in &mut self.geometry.vertices[num_initial_verts..] {
+				let uv = Vec2::from(vertex.pos) * scale + offset;
+				vertex.uv = uv.into();
+			}
+		}
 	}
 }
 
@@ -68,30 +117,38 @@ impl Painter {
 	pub fn set_clip_rect(&mut self, clip_rect: [u16; 4]) {
 		self.clip_rect = clip_rect;
 	}
+
+	pub fn set_color(&mut self, color: impl Into<Color>) {
+		self.color = color.into();
+	}
+
+	pub fn set_uv_rect(&mut self, uv_rect: impl Into<Option<Aabb2>>) {
+		self.uv_rect = uv_rect.into();
+	}
 }
 
 impl Painter {
-	pub fn circle_outline(&mut self, pos: impl Into<Vec2>, r: f32, color: impl Into<Color>) {
+	pub fn circle_outline(&mut self, pos: impl Into<Vec2>, r: f32) {
 		let pos = to_point(pos.into());
-		self.with_stroker(color, |tess, opts, builder| tess.tessellate_circle(pos, r, opts, builder).unwrap());
+		self.with_stroker(|tess, opts, builder| tess.tessellate_circle(pos, r, opts, builder).unwrap());
 	}
 
-	pub fn circle(&mut self, pos: impl Into<Vec2>, r: f32, color: impl Into<Color>) {
+	pub fn circle(&mut self, pos: impl Into<Vec2>, r: f32) {
 		let pos = to_point(pos.into());
-		self.with_filler(color, |tess, opts, builder| tess.tessellate_circle(pos, r, opts, builder).unwrap());
+		self.with_filler(|tess, opts, builder| tess.tessellate_circle(pos, r, opts, builder).unwrap());
 	}
 
-	pub fn rect_outline(&mut self, rect: impl Into<Aabb2>, color: impl Into<Color>) {
+	pub fn rect_outline(&mut self, rect: impl Into<Aabb2>) {
 		let rect = to_box_centroid(rect.into());
-		self.with_stroker(color, |tess, opts, builder| tess.tessellate_rectangle(&rect, opts, builder).unwrap());
+		self.with_stroker(|tess, opts, builder| tess.tessellate_rectangle(&rect, opts, builder).unwrap());
 	}
 
-	pub fn rect(&mut self, rect: impl Into<Aabb2>, color: impl Into<Color>) {
+	pub fn rect(&mut self, rect: impl Into<Aabb2>) {
 		let rect = to_box(rect.into());
-		self.with_filler(color, |tess, opts, builder| tess.tessellate_rectangle(&rect, opts, builder).unwrap());
+		self.with_filler(|tess, opts, builder| tess.tessellate_rectangle(&rect, opts, builder).unwrap());
 	}
 
-	pub fn rounded_rect_outline(&mut self, rect: impl Into<Aabb2>, radii: impl IntoBorderRadii, color: impl Into<Color>) {
+	pub fn rounded_rect_outline(&mut self, rect: impl Into<Aabb2>, radii: impl IntoBorderRadii) {
 		let rect = to_box_centroid(rect.into());
 
 		let mut scratch_path = std::mem::take(&mut self.scratch_path);
@@ -101,11 +158,11 @@ impl Painter {
 		builder.add_rounded_rectangle(&rect, &radii.to_radii(), PathWinding::Positive, &[]);
 		builder.build();
 
-		self.with_stroker(color, |tess, opts, builder| tess.tessellate(scratch_path.get(0).iter(), opts, builder).unwrap());
+		self.with_stroker(|tess, opts, builder| tess.tessellate(scratch_path.get(0).iter(), opts, builder).unwrap());
 		self.scratch_path = scratch_path;
 	}
 
-	pub fn rounded_rect(&mut self, rect: impl Into<Aabb2>, radii: impl IntoBorderRadii, color: impl Into<Color>) {
+	pub fn rounded_rect(&mut self, rect: impl Into<Aabb2>, radii: impl IntoBorderRadii) {
 		let rect = to_box(rect.into());
 
 		let mut scratch_path = std::mem::take(&mut self.scratch_path);
@@ -115,19 +172,19 @@ impl Painter {
 		builder.add_rounded_rectangle(&rect, &radii.to_radii(), PathWinding::Positive, &[]);
 		builder.build();
 
-		self.with_filler(color, |tess, opts, builder| tess.tessellate(scratch_path.get(0).iter(), opts, builder).unwrap());
+		self.with_filler(|tess, opts, builder| tess.tessellate(scratch_path.get(0).iter(), opts, builder).unwrap());
 		self.scratch_path = scratch_path;
 	}
 
-	pub fn stroke_path(&mut self, path: &Path, color: impl Into<Color>) {
-		self.with_stroker(color, |tess, opts, builder| tess.tessellate_path(path, opts, builder).unwrap());
+	pub fn stroke_path(&mut self, path: &Path) {
+		self.with_stroker(|tess, opts, builder| tess.tessellate_path(path, opts, builder).unwrap());
 	}
 
-	pub fn fill_path(&mut self, path: &Path, color: impl Into<Color>) {
-		self.with_filler(color, |tess, opts, builder| tess.tessellate_path(path, opts, builder).unwrap());
+	pub fn fill_path(&mut self, path: &Path) {
+		self.with_filler(|tess, opts, builder| tess.tessellate_path(path, opts, builder).unwrap());
 	}
 
-	pub fn line(&mut self, start: impl Into<Vec2>, end: impl Into<Vec2>, color: impl Into<Color>) {
+	pub fn line(&mut self, start: impl Into<Vec2>, end: impl Into<Vec2>) {
 		use lyon::path::PathEvent;
 
 		let start = to_point(start.into());
@@ -148,7 +205,7 @@ impl Painter {
 			},
 		];
 
-		self.with_stroker(color, move |tess, opts, builder| tess.tessellate(events, opts, builder).unwrap());
+		self.with_stroker(move |tess, opts, builder| tess.tessellate(events, opts, builder).unwrap());
 	}
 }
 
@@ -174,34 +231,34 @@ impl IntoBorderRadii for BorderRadii {
 
 
 
-struct VertexConstructor {
+struct VertexConstructor<'r> {
 	color: [f32; 4],
 	clip_rect: [u16; 4],
-	uv_rect: Option<Aabb2>,
 
-	total_rect: Aabb2,
+	total_rect: Option<&'r mut Aabb2>,
 }
 
-impl VertexConstructor {
+impl VertexConstructor<'_> {
 	fn new(color: impl Into<Color>, clip_rect: [u16; 4]) -> Self {
 		VertexConstructor {
 			color: color.into().into(),
 			clip_rect,
-			uv_rect: None,
-			total_rect: Aabb2::empty(),
+			total_rect: None,
 		}
 	}
 }
 
-impl FillVertexConstructor<renderer::Vertex> for VertexConstructor {
+impl FillVertexConstructor<renderer::Vertex> for VertexConstructor<'_> {
 	fn new_vertex(&mut self, vertex: FillVertex) -> renderer::Vertex {
 		let pos = vertex.position().to_array();
-		self.total_rect.min.x = self.total_rect.min.x.min(pos[0]);
-		self.total_rect.max.x = self.total_rect.max.x.max(pos[0]);
-		self.total_rect.min.y = self.total_rect.min.y.min(pos[1]);
-		self.total_rect.max.y = self.total_rect.max.y.max(pos[1]);
-		// TODO(pat.m): use total_rect + uv_rect to calculate uvs for primitive
-		// or maybe these can be stored in a primitive buffer?
+
+		if let Some(rect) = self.total_rect.as_mut() {
+			rect.min.x = rect.min.x.min(pos[0]);
+			rect.max.x = rect.max.x.max(pos[0]);
+			rect.min.y = rect.min.y.min(pos[1]);
+			rect.max.y = rect.max.y.max(pos[1]);
+		}
+
 		renderer::Vertex {
 			pos,
 			color: self.color,
@@ -211,9 +268,17 @@ impl FillVertexConstructor<renderer::Vertex> for VertexConstructor {
 	}
 }
 
-impl StrokeVertexConstructor<renderer::Vertex> for VertexConstructor {
+impl StrokeVertexConstructor<renderer::Vertex> for VertexConstructor<'_> {
 	fn new_vertex(&mut self, vertex: StrokeVertex) -> renderer::Vertex {
 		let pos = vertex.position().to_array();
+
+		if let Some(rect) = self.total_rect.as_mut() {
+			rect.min.x = rect.min.x.min(pos[0]);
+			rect.max.x = rect.max.x.max(pos[0]);
+			rect.min.y = rect.min.y.min(pos[1]);
+			rect.max.y = rect.max.y.max(pos[1]);
+		}
+
 		renderer::Vertex {
 			pos,
 			color: self.color,

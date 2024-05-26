@@ -41,7 +41,8 @@ pub struct GlyphInfo {
 	pub uv_x: f32,
 	pub uv_y: f32,
 
-	// TODO(pat.m): record whether its subpixel or not
+	pub subpixel_alpha: bool,
+	pub is_color_bitmap: bool,
 }
 
 
@@ -72,7 +73,7 @@ impl TextState {
 					self.row_height = 0;
 				}
 
-				self.row_height = self.row_height.max(height);
+				self.row_height = self.row_height.max(height + 1);
 
 				let info = GlyphInfo {
 					width: width as f32,
@@ -83,6 +84,9 @@ impl TextState {
 
 					uv_x: self.cursor_x as f32,
 					uv_y: self.cursor_y as f32,
+
+					subpixel_alpha: image.content == ct::SwashContent::SubpixelMask,
+					is_color_bitmap: image.content == ct::SwashContent::Color,
 				};
 
 				self.glyph_updates.push(GlyphUpdate {
@@ -90,7 +94,7 @@ impl TextState {
 					dst_pos: Vec2i::new(self.cursor_x as i32, self.cursor_y as i32),
 				});
 
-				self.cursor_x += width;
+				self.cursor_x += width + 1;
 
 				info
 			})

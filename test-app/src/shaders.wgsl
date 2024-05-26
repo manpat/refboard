@@ -57,17 +57,29 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
 	// TODO(pat.m): Flag sampling operations as being either dual-source or regular rgba
 
 	let tex_color = textureSample(text_atlas_tex, text_atlas_sampler, input.uv);
-	let tex_alpha1 = textureSample(text_atlas_tex, text_atlas_sampler, input.uv - vec2f(0.5 / 2048.0, 0.0)).a;
-	let tex_alpha2 = textureSample(text_atlas_tex, text_atlas_sampler, input.uv + vec2f(0.5 / 2048.0, 0.0)).a;
 
-	// let alpha_alpha = input.color.a * tex_color.a;
-	let alpha_alpha = input.color.a * (tex_alpha1 + tex_color.a + tex_alpha2) / 3.0;
+	// TODO(pat.m): this will come from a bitmap at some point - I'm just fucking around
+
+	let spread = 0.2 / 2048.0;
+	let distribution = 0.3;
+
+	let tex_alpha_r1 = textureSample(text_atlas_tex, text_atlas_sampler, input.uv - vec2f(spread, 0.0)).a * distribution;
+	let tex_alpha_g0 = tex_color.a * (1.0 - distribution * 2.0);
+	let tex_alpha_b1 = textureSample(text_atlas_tex, text_atlas_sampler, input.uv + vec2f(spread, 0.0)).a * distribution;
+
+	let alpha_alpha = input.color.a * (tex_alpha_r1 + tex_alpha_g0 + tex_alpha_b1);
 
 	let color = vec3f(input.color.rgb * tex_color.rgb);
-	let alpha = vec3f(input.color.a) * vec3f(tex_alpha1, tex_color.a, tex_alpha2);
+	let alpha = vec3f(input.color.a) * vec3f(
+		tex_alpha_r1*2.0 + tex_alpha_g0,
+		tex_alpha_r1 + tex_alpha_g0 + tex_alpha_b1,
+		tex_alpha_g0 + tex_alpha_b1*2.0
+	);
 
 	return FragmentOutput(
 		vec4(color * alpha, alpha_alpha),
 		vec4(alpha, 1.0),
 	);
 }
+
+
