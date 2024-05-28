@@ -253,7 +253,7 @@ impl Renderer {
 				texture: &text_atlas_texture,
 				origin: wgpu::Origin3d {
 					x: text_atlas_texture.width() - 4,
-					y: text_atlas_texture.height() - 4,
+					y: text_atlas_texture.height() - 1,
 					z: 0,
 				},
 
@@ -269,12 +269,12 @@ impl Renderer {
 
 			let size = wgpu::Extent3d {
 				width: 4,
-				height: 4,
+				height: 1,
 				depth_or_array_layers: 1,
 			};
 
 			// Write single white pixel for non-textured geometry
-			queue.write_texture(image_copy, &[255; 4 * 16], data_layout, size);
+			queue.write_texture(image_copy, &[255; 4 * 4], data_layout, size);
 		}
 
 		Ok(Renderer {

@@ -3,12 +3,16 @@ use crate::prelude::*;
 pub mod widget;
 pub mod widget_ref;
 pub mod widgets;
+pub mod style;
+pub mod text;
 pub mod layout;
 pub mod hierarchy;
 
 pub use widget::*;
 pub use widgets::*;
 pub use widget_ref::*;
+pub use style::*;
+pub use text::*;
 pub use layout::*;
 pub use hierarchy::*;
 
@@ -16,94 +20,6 @@ use super::Input;
 
 use std::any::{TypeId, Any};
 use std::marker::PhantomData;
-
-use cosmic_text as ct;
-
-
-pub const TEXT_ATLAS_SIZE: u32 = 2048;
-
-
-pub struct GlyphUpdate {
-	pub image: ct::SwashImage,
-	pub dst_pos: Vec2i,
-}
-
-impl std::fmt::Debug for GlyphUpdate {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "GlyphUpdate({:?})", self.dst_pos)
-	}
-}
-
-#[derive(Debug)]
-pub struct GlyphInfo {
-	pub width: f32,
-	pub height: f32,
-
-	pub offset_x: f32,
-	pub offset_y: f32,
-
-	pub uv_x: f32,
-	pub uv_y: f32,
-
-	pub subpixel_alpha: bool,
-	pub is_color_bitmap: bool,
-}
-
-
-#[derive(Debug)]
-pub struct TextState {
-	pub font_system: ct::FontSystem,
-	pub swash_cache: ct::SwashCache,
-
-	pub glyph_updates: Vec<GlyphUpdate>,
-	pub glyph_info: HashMap<ct::CacheKey, GlyphInfo>,
-
-	cursor_x: u32,
-	cursor_y: u32,
-	row_height: u32,
-}
-
-impl TextState {
-	pub fn request_glyph(&mut self, key: &ct::CacheKey) -> &GlyphInfo {
-		self.glyph_info.entry(*key)
-			.or_insert_with(|| {
-				// TODO(pat.m): we might need to use swash directly if we want subpixel raster
-				let image = self.swash_cache.get_image_uncached(&mut self.font_system, *key).unwrap();
-				let ct::Placement {width, height, left, top} = image.placement;
-
-				if self.cursor_x + width > TEXT_ATLAS_SIZE {
-					self.cursor_y += self.row_height;
-					self.cursor_x = 0;
-					self.row_height = 0;
-				}
-
-				self.row_height = self.row_height.max(height + 1);
-
-				let info = GlyphInfo {
-					width: width as f32,
-					height: height as f32,
-
-					offset_x: left as f32,
-					offset_y: -top as f32,
-
-					uv_x: self.cursor_x as f32,
-					uv_y: self.cursor_y as f32,
-
-					subpixel_alpha: image.content == ct::SwashContent::SubpixelMask,
-					is_color_bitmap: image.content == ct::SwashContent::Color,
-				};
-
-				self.glyph_updates.push(GlyphUpdate {
-					image,
-					dst_pos: Vec2i::new(self.cursor_x as i32, self.cursor_y as i32),
-				});
-
-				self.cursor_x += width + 1;
-
-				info
-			})
-	}
-}
 
 
 pub struct System {
@@ -113,23 +29,9 @@ pub struct System {
 
 impl System {
 	pub fn new() -> System {
-		let font_system = ct::FontSystem::new();
-		let swash_cache = ct::SwashCache::new();
-
 		System {
 			persistent_state: PersistentState::default(),
-
-			text_state: TextState {
-				font_system,
-				swash_cache,
-
-				glyph_updates: Vec::new(),
-				glyph_info: HashMap::new(),
-
-				cursor_x: 0,
-				cursor_y: 0,
-				row_height: 0,
-			}.into(),
+			text_state: TextState::new().into(),
 		}
 	}
 
@@ -398,65 +300,6 @@ impl<'ps> Ui<'ps> {
 				max: Vec2::new(lhs.max.x.min(rhs.max.x), lhs.max.y.min(rhs.max.y)),
 			}
 		}
-
-
-
-
-		// painter.set_clip_rect(to_4u16(&null_clip_rect));
-
-		// let metrics = ct::Metrics::new(24.0, 32.0);
-		// let mut buffer = ct::Buffer::new(&mut text_state.font_system, metrics);
-		// {
-		// 	let mut buffer = buffer.borrow_with(&mut text_state.font_system);
-		// 	buffer.set_size(500.0, 80.0);
-
-		// 	let attrs = ct::Attrs::new();
-
-		// 	buffer.set_text("Hello, Rust! 🦀 🐄🦐🅱 I'm emoting العربية ", attrs, ct::Shaping::Advanced);
-		// 	buffer.shape_until_scroll(true);
-		// }
-
-		// for run in buffer.layout_runs() {
-		// 	for glyph in run.glyphs.iter() {
-		// 		let physical_glyph = glyph.physical((0., 0.), 1.0);
-
-		// 		let glyph_color = match glyph.color_opt {
-		// 			Some(some) => some,
-		// 			None => ct::Color::rgb(0xFF, 0x55, 0xFF),
-		// 		};
-
-		// 		let Some(commands) = text_state.swash_cache.get_outline_commands(&mut text_state.font_system, physical_glyph.cache_key)
-		// 		else { continue };
-
-		// 		let to_point = |[x, y]: [f32; 2]| {
-		// 			lyon::math::Point::new(x + physical_glyph.x as f32 + 100.0, -y + physical_glyph.y as f32 + 300.0)
-		// 		};
-
-		// 		let mut builder = lyon::path::Path::builder().with_svg();
-
-		// 		for command in commands {
-		// 			match *command {
-		// 				ct::Command::MoveTo(p) => { builder.move_to(to_point(p.into())); }
-		// 				ct::Command::LineTo(p) => { builder.line_to(to_point(p.into())); }
-		// 				ct::Command::CurveTo(c1, c2, to) => { builder.cubic_bezier_to(to_point(c1.into()), to_point(c2.into()), to_point(to.into())); }
-		// 				ct::Command::QuadTo(c, to) => { builder.quadratic_bezier_to(to_point(c.into()), to_point(to.into())); }
-		// 				ct::Command::Close => { builder.close(); }
-		// 			}
-		// 		}
-
-		// 		painter.fill_path(&builder.build(), Color::from(glyph_color.as_rgba()).to_linear());
-		// 	}
-		// }
-
-
-		// // let text_color = ct::Color::rgb(0xFF, 0xFF, 0xFF);
-		// // buffer.draw(&mut text_state.swash_cache, text_color, |x, y, w, h, color| {
-		// // 	let pos = Vec2::new(x as f32 + 100.0, y as f32 + 300.0);
-		// // 	let size = Vec2::new(w as f32 + 1.0, h as f32 + 1.0);
-		// // 	let rect = Aabb2::new(pos, pos + size);
-
-		// // 	painter.rect(rect, Color::from(color.as_rgba()).to_linear());
-		// // });
 	}
 }
 
