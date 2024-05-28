@@ -23,7 +23,7 @@ struct VertexOutput {
 
 @vertex
 fn vs_main(vertex: VertexInput) -> VertexOutput {
-	let transform = transpose(mat2x3(globals.row_x.xyw, globals.row_y.xyw));
+	let transform = transpose(mat2x3(globals.row_x.xyz, globals.row_y.xyz));
 
 	let clip_position = transform * vec3f(vertex.position, 1.0);
 	

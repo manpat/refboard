@@ -34,7 +34,7 @@ impl View {
 		}
 	}
 
-	pub fn prepare_frame(&mut self) {
+	pub fn prepare_next_frame(&mut self) {
 		self.should_redraw = false;
 		self.input.prepare_frame();
 	}
@@ -221,7 +221,7 @@ impl Input {
 	}
 
 	pub fn send_event(&mut self, event: WindowEvent) {
-		self.events_received_this_frame = false;
+		self.events_received_this_frame = true;
 
 		match event {
 			WindowEvent::CursorMoved { position, .. } => {

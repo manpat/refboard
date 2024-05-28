@@ -113,6 +113,10 @@ async fn main() -> anyhow::Result<()> {
 
 						window.pre_present_notify();
 						renderer.present();
+
+						app.apply_changes();
+
+						view.prepare_next_frame();
 					}
 
 					WindowEvent::Resized(new_physical_size) => {
@@ -136,7 +140,6 @@ async fn main() -> anyhow::Result<()> {
 						| WindowEvent::KeyboardInput{..}
 					=> {
 						view.input.send_event(event);
-						window.request_redraw();
 					}
 
 					_ => {}
@@ -144,13 +147,14 @@ async fn main() -> anyhow::Result<()> {
 			}
 
 			Event::AboutToWait => {
-				if view.should_redraw() || app.hack_changed.get() {
+				if app.hack_changed.get() {
 					app.hack_changed.set(false);
 					window.request_redraw();
 				}
 
-				app.apply_changes();
-				view.prepare_frame();
+				if view.should_redraw() {
+					window.request_redraw();
+				}
 			}
 
 			_ => {}

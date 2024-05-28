@@ -237,7 +237,7 @@ impl Widget for Button {
 
 
 // TODO(pat.m): more dynamic
-const HACK_FONT_SIZE: f32 = 16.0;
+const HACK_FONT_SIZE: f32 = 14.0;
 const HACK_LINE_HEIGHT: f32 = HACK_FONT_SIZE; // 24.0;
 
 
@@ -312,10 +312,14 @@ impl Widget for Text {
 
 		let font_system = &mut ctx.text_state.font_system;
 
+		// TODO(pat.m): do layout twice - once with unbounded/max size to find the desired size for constraining
+		// then again with calculated size for rendering.
+		// Both of these can be cached.
 		let size = ctx.layout.content_bounds.size();
 		let start_pos = ctx.layout.content_bounds.min;
 		state.buffer.set_size(font_system, size.x, size.y);
 
+		// TODO(pat.m): move into painter
 		for run in state.buffer.layout_runs() {
 			for glyph in run.glyphs.iter() {
 				let physical_glyph = glyph.physical(start_pos.to_tuple(), 1.0);
@@ -344,17 +348,6 @@ impl Widget for Text {
 		}
 
 		ctx.painter.set_uv_rect(None);
-
-		// let (r, g, b, a) = self.color.to_srgb().to_byte_tuple();
-		// let text_color = ct::Color::rgba(r, g, b, a);
-
-		// state.buffer.draw(font_system, &mut ctx.text_state.swash_cache, text_color, |x, y, w, h, color| {
-		// 	let pos = Vec2::new(x as f32, y as f32) + start_pos;
-		// 	let size = Vec2::new(w as f32, h as f32);
-		// 	let rect = Aabb2::new(pos, pos + size);
-
-		// 	ctx.painter.rect(rect, Color::from(color.as_rgba()).to_linear());
-		// });
 	}
 }
 

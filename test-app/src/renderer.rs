@@ -12,7 +12,6 @@ pub struct Renderer {
 	framebuffer: wgpu::TextureView,
 
 	text_atlas_texture: wgpu::Texture,
-	text_atlas_texture_view: wgpu::TextureView,
 
 	globals_buffer: wgpu::Buffer,
 	vector_bind_group: wgpu::BindGroup,
@@ -137,8 +136,6 @@ impl Renderer {
 			},
 		};
 
-		// let blend_state = wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING;
-
 		let vector_render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
 			label: None,
 			layout: Some(&pipeline_layout),
@@ -207,8 +204,8 @@ impl Renderer {
 			label: Some("Text Atlas"),
 			size: wgpu::Extent3d {
 				// TODO(pat.m): should come from limits/TextState
-				width: 2048,
-				height: 2048,
+				width: view::ui::TEXT_ATLAS_SIZE,
+				height: view::ui::TEXT_ATLAS_SIZE,
 				depth_or_array_layers: 1,
 			},
 			mip_level_count: 1,
@@ -293,7 +290,6 @@ impl Renderer {
 			framebuffer,
 
 			text_atlas_texture,
-			text_atlas_texture_view,
 
 			vertex_buffer,
 			index_buffer,
@@ -352,8 +348,8 @@ impl Renderer {
 
 		self.queue.write_buffer(&self.globals_buffer, 0, bytemuck::cast_slice(&[
 			Globals {
-				row_x: [ basis_x.x, basis_y.x, 0.0, translation.x],
-				row_y: [ basis_x.y, basis_y.y, 0.0, translation.y],
+				row_x: [ basis_x.x, basis_y.x, translation.x, 0.0],
+				row_y: [ basis_x.y, basis_y.y, translation.y, 0.0],
 			}
 		]));
 

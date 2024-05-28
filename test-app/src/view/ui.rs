@@ -1,12 +1,14 @@
 use crate::prelude::*;
 
 pub mod widget;
+pub mod widget_ref;
 pub mod widgets;
 pub mod layout;
 pub mod hierarchy;
 
 pub use widget::*;
 pub use widgets::*;
+pub use widget_ref::*;
 pub use layout::*;
 pub use hierarchy::*;
 
@@ -14,10 +16,12 @@ use super::Input;
 
 use std::any::{TypeId, Any};
 use std::marker::PhantomData;
-// use std::hash::{DefaultHasher, Hasher, Hash};
-
 
 use cosmic_text as ct;
+
+
+pub const TEXT_ATLAS_SIZE: u32 = 2048;
+
 
 pub struct GlyphUpdate {
 	pub image: ct::SwashImage,
@@ -67,7 +71,7 @@ impl TextState {
 				let image = self.swash_cache.get_image_uncached(&mut self.font_system, *key).unwrap();
 				let ct::Placement {width, height, left, top} = image.placement;
 
-				if self.cursor_x + width > 2048 {
+				if self.cursor_x + width > TEXT_ATLAS_SIZE {
 					self.cursor_y += self.row_height;
 					self.cursor_x = 0;
 					self.row_height = 0;
