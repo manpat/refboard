@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use super::{WidgetId, StateBox, Layout, LayoutConstraints, LayoutConstraintMap};
+use super::{WidgetId, Input, StateBox, Layout, LayoutConstraints, LayoutConstraintMap};
 
 use std::fmt::Debug;
 
@@ -19,6 +19,7 @@ pub struct DrawContext<'a> {
 
 	pub state: &'a mut StateBox,
 	pub text_state: &'a mut super::TextState,
+	pub input: &'a Input,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -33,6 +34,7 @@ pub struct LifecycleContext<'a> {
 	pub state: &'a mut StateBox,
 	
 	pub text_state: &'a mut super::TextState,
+	pub input: &'a Input,
 }
 
 

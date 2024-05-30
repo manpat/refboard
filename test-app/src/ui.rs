@@ -18,49 +18,76 @@ pub use text::*;
 pub use layout::*;
 pub use hierarchy::*;
 pub use viewport::*;
-
-pub use input::Input;
+pub use input::*;
 
 use std::any::{TypeId, Any};
 use std::marker::PhantomData;
 
 
 pub struct System {
-	persistent_state: PersistentState,
+	pub viewport: Viewport,
+	pub input: Input,
 	pub text_state: RefCell<TextState>,
+
+	persistent_state: PersistentState,
+	should_redraw: bool,
 }
 
 impl System {
 	pub fn new() -> System {
 		System {
-			persistent_state: PersistentState::default(),
+			viewport: Viewport::default(),
+			input: Input::default(),
 			text_state: TextState::new().into(),
+
+			persistent_state: PersistentState::default(),
+			should_redraw: true,
 		}
 	}
 
+	pub fn set_size(&mut self, new_size: Vec2i) {
+		if self.viewport.size.to_vec2i() != new_size {
+			self.should_redraw = true;
+			self.viewport.size = new_size.to_vec2();
+		}
+	}
+
+	pub fn prepare_next_frame(&mut self) {
+		self.should_redraw = false;
+		self.input.prepare_frame();
+	}
+
+	pub fn update_input(&mut self) {
+		self.input.process_events(&self.viewport);
+	}
+
+	pub fn should_redraw(&self) -> bool {
+		self.should_redraw || self.input.events_received_this_frame
+	}
+
 	// TODO(pat.m): could this be built around the same mechanism as std::thread::scope?
-	pub fn run(&mut self, bounds: Aabb2, painter: &mut Painter, input: &Input, build_ui: impl FnOnce(&Ui<'_>)) {
+	pub fn run(&mut self, painter: &mut Painter, build_ui: impl FnOnce(&Ui<'_>)) {
 		self.persistent_state.hierarchy.get_mut().new_epoch();
 
-		self.process_input(input);
+		self.process_input();
 
-		let mut ui = Ui::new(&self.persistent_state, input, &self.text_state);
+		let mut ui = Ui::new(&self.persistent_state, &self.input, &self.text_state);
 
 		build_ui(&ui);
 
 		self.garbage_collect();
 
-		ui.layout(bounds);
-		ui.handle_input(input);
+		ui.layout(self.viewport.view_bounds());
+		ui.handle_input();
 		ui.draw(painter);
 	}
 
-	fn process_input(&mut self, input: &Input) {
+	fn process_input(&mut self) {
 		self.persistent_state.hovered_widget.set(None);
 
 		// TODO(pat.m): collect input behaviour from existing widgets
 
-		if let Some(cursor_pos) = input.cursor_pos_view {
+		if let Some(cursor_pos) = self.input.cursor_pos_view {
 			let input_handlers = self.persistent_state.input_handlers.borrow();
 
 			// TODO(pat.m): instead of just storing the last hovered widget, store a 'stack' of hovered widgets
@@ -88,6 +115,7 @@ impl System {
 						event: WidgetLifecycleEvent::Destroyed,
 						state: &mut widget_state.state,
 						text_state,
+						input: &self.input,
 					});
 				}
 			});
@@ -241,7 +269,7 @@ impl<'ps> Ui<'ps> {
 		});
 	}
 
-	fn handle_input(&mut self, _input: &Input) {
+	fn handle_input(&mut self) {
 		// Persist widget bounds
 		let mut input_handlers = self.persistent_state.input_handlers.borrow_mut();
 		input_handlers.clear();
@@ -278,7 +306,8 @@ impl<'ps> Ui<'ps> {
 				layout,
 				text_state,
 
-				state: &mut widget_state.state
+				state: &mut widget_state.state,
+				input: self.input,
 			});
 
 			// Visualise clip rects
@@ -346,6 +375,7 @@ impl Ui<'_> {
 					event: WidgetLifecycleEvent::Created,
 					state: &mut widget_box.state,
 					text_state,
+					input: self.input,
 				});
 
 				widgets.insert(widget_id, widget_box);
@@ -367,6 +397,7 @@ impl Ui<'_> {
 					event: WidgetLifecycleEvent::Updated,
 					state: &mut widget_box.state,
 					text_state,
+					input: self.input,
 				});
 			}
 		}

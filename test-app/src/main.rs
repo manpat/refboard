@@ -81,13 +81,14 @@ async fn main() -> anyhow::Result<()> {
 
 	let mut renderer = renderer::Renderer::start(window.clone()).await?;
 	let mut painter = painter::Painter::new();
-
-	let mut app = app::App::default();
-	let mut view = view::View::new();
-	view.set_size({
+	let mut ui_system = ui::System::new();
+	ui_system.set_size({
 		let physical_size = window.inner_size().cast();
 		Vec2i::new(physical_size.width, physical_size.height)
 	});
+
+	let mut app = app::App::default();
+	let mut view = view::View::new();
 
 	event_loop.set_control_flow(ControlFlow::Wait);
 
@@ -95,7 +96,7 @@ async fn main() -> anyhow::Result<()> {
 		match event {
 			// Initial present/show window
 			Event::NewEvents(StartCause::Init) => {
-				renderer.prepare(&painter, &view.viewport, &mut *view.ui.text_state.borrow_mut());
+				renderer.prepare(&painter, &ui_system.viewport, &mut *ui_system.text_state.borrow_mut());
 
 				window.pre_present_notify();
 				renderer.present();
@@ -107,23 +108,26 @@ async fn main() -> anyhow::Result<()> {
 			Event::WindowEvent { window_id: _, event } => {
 				match event {
 					WindowEvent::RedrawRequested => {
-						view.update_input();
+						ui_system.update_input();
 
 						painter.clear();
-						view.paint(&mut painter, &app);
-						renderer.prepare(&painter, &view.viewport, &mut *view.ui.text_state.borrow_mut());
+						ui_system.run(&mut painter, |ui| {
+							view.build(ui, &app);
+						});
+						
+						renderer.prepare(&painter, &ui_system.viewport, &mut *ui_system.text_state.borrow_mut());
 
 						window.pre_present_notify();
 						renderer.present();
 
 						app.apply_changes();
 
-						view.prepare_next_frame();
+						ui_system.prepare_next_frame();
 					}
 
 					WindowEvent::Resized(new_physical_size) => {
 						renderer.resize(new_physical_size.width, new_physical_size.height);
-						view.set_size(Vec2i::new(new_physical_size.width as i32, new_physical_size.height as i32));
+						ui_system.set_size(Vec2i::new(new_physical_size.width as i32, new_physical_size.height as i32));
 					}
 
 					// TODO(pat.m): theme change
@@ -141,7 +145,7 @@ async fn main() -> anyhow::Result<()> {
 						| WindowEvent::MouseWheel{..}
 						| WindowEvent::KeyboardInput{..}
 					=> {
-						view.input.send_event(event);
+						ui_system.input.send_event(event);
 					}
 
 					_ => {}
@@ -154,7 +158,7 @@ async fn main() -> anyhow::Result<()> {
 					window.request_redraw();
 				}
 
-				if view.should_redraw() {
+				if ui_system.should_redraw() {
 					window.request_redraw();
 				}
 			}
