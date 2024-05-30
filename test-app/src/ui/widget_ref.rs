@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use super::{WidgetId, Widget, Ui, StateBox, LayoutConstraints};
 
 use std::cell::RefMut;
@@ -63,7 +64,7 @@ impl<'ui, T> WidgetRef<'ui, T> {
 	}
 
 	pub fn is_clicked(&self) -> bool {
-		self.is_hovered() && self.ui.input.click_received
+		self.is_hovered() && self.ui.input.was_mouse_released(ui::MouseButton::Left)
 	}
 
 	// TODO(pat.m): is focussed

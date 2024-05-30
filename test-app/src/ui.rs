@@ -88,6 +88,7 @@ impl System {
 
 		// TODO(pat.m): collect input behaviour from existing widgets
 
+		// TODO(pat.m): move this into Input::process_events, along with input_handlers
 		if let Some(cursor_pos) = self.input.cursor_pos_view {
 			let input_handlers = self.persistent_state.input_handlers.borrow();
 
@@ -198,8 +199,10 @@ struct WidgetBox {
 #[derive(Debug, Default)]
 pub struct PersistentState {
 	widgets: RefCell<HashMap<WidgetId, WidgetBox>>,
-	input_handlers: RefCell<HashMap<WidgetId, Aabb2>>,
 	hierarchy: RefCell<Hierarchy>,
+
+	// TODO(pat.m): move into Input
+	input_handlers: RefCell<HashMap<WidgetId, Aabb2>>,
 }
 
 

@@ -227,9 +227,14 @@ impl Widget for Button {
 		let rounding = 4.0;
 
 		let is_hovered = ctx.input.hovered_widget == Some(ctx.widget_id);
-		let fill_color = match is_hovered {
-			true => Color::grey(0.2),
-			false => Color::grey(0.1),
+
+		// TODO(pat.m): should be hot_widget/active_widget?
+		let is_down = ctx.input.is_mouse_down(ui::MouseButton::Left);
+
+		let fill_color = match (is_hovered, is_down) {
+			(true, true) => Color::grey(0.3),
+			(true, false) => Color::grey(0.2),
+			(false, _) => Color::grey(0.1),
 		};
 
 		ctx.painter.set_color(fill_color);
