@@ -1,5 +1,5 @@
 // use crate::prelude::*;
-use crate::view::ui::*;
+use crate::ui::*;
 
 use std::fmt::{self, Debug};
 

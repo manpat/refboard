@@ -16,7 +16,7 @@ pub use text::*;
 pub use layout::*;
 pub use hierarchy::*;
 
-use super::Input;
+use view::Input;
 
 use std::any::{TypeId, Any};
 use std::marker::PhantomData;

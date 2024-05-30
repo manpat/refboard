@@ -1,7 +1,5 @@
 use crate::prelude::*;
 
-pub mod ui;
-
 pub struct View {
 	// item view
 	// gizmo overlay

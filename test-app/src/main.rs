@@ -11,6 +11,8 @@ use std::sync::Arc;
 use common::*;
 
 
+pub mod ui;
+
 pub mod renderer;
 pub mod painter;
 pub mod app;
@@ -20,7 +22,7 @@ pub mod util;
 pub mod prelude {
 	pub use common::*;
 
-	pub use super::{painter, renderer, app, view};
+	pub use super::{painter, renderer, app, view, ui};
 	pub use super::util::*;
 	
 	pub use painter::Painter;

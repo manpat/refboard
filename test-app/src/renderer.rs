@@ -204,8 +204,8 @@ impl Renderer {
 			label: Some("Text Atlas"),
 			size: wgpu::Extent3d {
 				// TODO(pat.m): should come from limits/TextState
-				width: view::ui::TEXT_ATLAS_SIZE,
-				height: view::ui::TEXT_ATLAS_SIZE,
+				width: ui::TEXT_ATLAS_SIZE,
+				height: ui::TEXT_ATLAS_SIZE,
 				depth_or_array_layers: 1,
 			},
 			mip_level_count: 1,
@@ -334,7 +334,7 @@ impl Renderer {
 		}
 	}
 
-	pub fn prepare(&mut self, painter: &Painter, viewport: &view::Viewport, text_state: &mut crate::view::ui::TextState) {
+	pub fn prepare(&mut self, painter: &Painter, viewport: &view::Viewport, text_state: &mut ui::TextState) {
 		let vertex_bytes = bytemuck::cast_slice(&painter.geometry.vertices);
 		let index_bytes = bytemuck::cast_slice(&painter.geometry.indices);
 
@@ -353,7 +353,7 @@ impl Renderer {
 			}
 		]));
 
-		for crate::view::ui::GlyphUpdate{image, dst_pos} in text_state.glyph_updates.drain(..) {
+		for ui::GlyphUpdate{image, dst_pos} in text_state.glyph_updates.drain(..) {
 			let placement = image.placement;
 
 			let mut data = image.data;
