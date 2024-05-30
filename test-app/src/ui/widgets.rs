@@ -226,10 +226,17 @@ impl Widget for Button {
 	fn draw(&self, ctx: DrawContext<'_>) {
 		let rounding = 4.0;
 
-		ctx.painter.set_color(Color::grey(0.3));
+		let is_hovered = ctx.input.hovered_widget == Some(ctx.widget_id);
+		let fill_color = match is_hovered {
+			true => Color::grey(0.2),
+			false => Color::grey(0.1),
+		};
+
+		ctx.painter.set_color(fill_color);
 		ctx.painter.rounded_rect(ctx.layout.box_bounds, rounding);
 
-		ctx.painter.set_color(Color::grey(0.5));
+		ctx.painter.set_line_width(1.0);
+		ctx.painter.set_color(Color::grey(0.2));
 		ctx.painter.rounded_rect_outline(ctx.layout.box_bounds, rounding);
 	}
 }

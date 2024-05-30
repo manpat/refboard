@@ -8,6 +8,7 @@ pub struct ConstraintContext<'a> {
 	pub constraints: &'a mut LayoutConstraints,
 	pub constraint_map: &'a LayoutConstraintMap,
 	pub children: &'a [WidgetId],
+	pub widget_id: WidgetId,
 
 	pub state: &'a mut StateBox,
 	pub text_state: &'a mut super::TextState,
@@ -16,6 +17,7 @@ pub struct ConstraintContext<'a> {
 pub struct DrawContext<'a> {
 	pub painter: &'a mut Painter,
 	pub layout: &'a Layout,
+	pub widget_id: WidgetId,
 
 	pub state: &'a mut StateBox,
 	pub text_state: &'a mut super::TextState,
@@ -32,6 +34,7 @@ pub enum WidgetLifecycleEvent {
 pub struct LifecycleContext<'a> {
 	pub event: WidgetLifecycleEvent,
 	pub state: &'a mut StateBox,
+	pub widget_id: WidgetId,
 	
 	pub text_state: &'a mut super::TextState,
 	pub input: &'a Input,

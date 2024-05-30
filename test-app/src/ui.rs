@@ -31,6 +31,8 @@ pub struct System {
 
 	persistent_state: PersistentState,
 	should_redraw: bool,
+
+	widget_layouts: LayoutMap,
 }
 
 impl System {
@@ -42,6 +44,8 @@ impl System {
 
 			persistent_state: PersistentState::default(),
 			should_redraw: true,
+
+			widget_layouts: LayoutMap::new(),
 		}
 	}
 
@@ -54,11 +58,7 @@ impl System {
 
 	pub fn prepare_next_frame(&mut self) {
 		self.should_redraw = false;
-		self.input.prepare_frame();
-	}
-
-	pub fn update_input(&mut self) {
-		self.input.process_events(&self.viewport);
+		self.input.reset();
 	}
 
 	pub fn should_redraw(&self) -> bool {
@@ -69,7 +69,7 @@ impl System {
 	pub fn run(&mut self, painter: &mut Painter, build_ui: impl FnOnce(&Ui<'_>)) {
 		self.persistent_state.hierarchy.get_mut().new_epoch();
 
-		self.process_input();
+		self.interpret_input();
 
 		let mut ui = Ui::new(&self.persistent_state, &self.input, &self.text_state);
 
@@ -77,13 +77,14 @@ impl System {
 
 		self.garbage_collect();
 
-		ui.layout(self.viewport.view_bounds());
-		ui.handle_input();
-		ui.draw(painter);
+		ui.layout(self.viewport.view_bounds(), &mut self.widget_layouts);
+		ui.draw(painter, &self.widget_layouts);
+
+		self.persist_input_bounds();
 	}
 
-	fn process_input(&mut self) {
-		self.persistent_state.hovered_widget.set(None);
+	fn interpret_input(&mut self) {
+		self.input.process_events(&self.viewport);
 
 		// TODO(pat.m): collect input behaviour from existing widgets
 
@@ -94,13 +95,26 @@ impl System {
 			self.persistent_state.hierarchy.borrow()
 				.visit_breadth_first(None, |widget_id, _| {
 					if input_handlers[&widget_id].contains_point(cursor_pos) {
-						self.persistent_state.hovered_widget.set(Some(widget_id));
+						self.input.hovered_widget = Some(widget_id);
 					}
 				});
 
 			// TODO(pat.m): from the input behaviour of each widget in the hovered widget stack, calculate the target of 
 			// any mouse click/keyboard events.
 		}
+	}
+
+	fn persist_input_bounds(&mut self) {
+		// Persist widget bounds
+		let mut input_handlers = self.persistent_state.input_handlers.borrow_mut();
+		input_handlers.clear();
+
+		self.persistent_state.hierarchy.borrow()
+			.visit_breadth_first(None, |widget_id, _| {
+				// TODO(pat.m): clipping! also we probably want some per-widget configuration of input behaviour
+				let box_bounds = self.widget_layouts[&widget_id].box_bounds;
+				input_handlers.insert(widget_id, box_bounds);
+			});
 	}
 
 	fn garbage_collect(&self) {
@@ -116,6 +130,7 @@ impl System {
 						state: &mut widget_state.state,
 						text_state,
 						input: &self.input,
+						widget_id,
 					});
 				}
 			});
@@ -185,8 +200,6 @@ pub struct PersistentState {
 	widgets: RefCell<HashMap<WidgetId, WidgetBox>>,
 	input_handlers: RefCell<HashMap<WidgetId, Aabb2>>,
 	hierarchy: RefCell<Hierarchy>,
-
-	hovered_widget: Cell<Option<WidgetId>>,
 }
 
 
@@ -198,9 +211,7 @@ pub struct WidgetId(u64);
 #[derive(Debug)]
 pub struct Ui<'ps> {
 	stack: RefCell<Vec<WidgetId>>,
-
 	widget_constraints: RefCell<LayoutConstraintMap>,
-	widget_layouts: LayoutMap,
 
 	persistent_state: &'ps PersistentState,
 	pub text_state: &'ps RefCell<TextState>,
@@ -213,15 +224,13 @@ impl<'ps> Ui<'ps> {
 			stack: Default::default(),
 			widget_constraints: LayoutConstraintMap::default().into(),
 
-			widget_layouts: LayoutMap::new(),
-
 			persistent_state,
 			text_state,
 			input,
 		}
 	}
 
-	fn layout(&mut self, available_bounds: Aabb2) {
+	fn layout(&mut self, available_bounds: Aabb2, widget_layouts: &mut LayoutMap) {
 		let hierarchy = self.persistent_state.hierarchy.borrow();
 		let mut widgets = self.persistent_state.widgets.borrow_mut();
 		let mut widget_constraints = self.widget_constraints.borrow_mut();
@@ -244,45 +253,33 @@ impl<'ps> Ui<'ps> {
 
 				state: &mut widget_state.state,
 				text_state,
+				widget_id,
 			});
 
 			widget_constraints.insert(widget_id, constraints);
 		});
 
-		self.widget_layouts.clear();
-		self.widget_layouts.reserve(num_widgets);
+		widget_layouts.clear();
+		widget_layouts.reserve(num_widgets);
 
 		for &widget_id in hierarchy.root_node.children.iter() {
-			layout_children_linear(available_bounds, Axis::Horizontal, Align::Start, &[widget_id], &widget_constraints, &mut self.widget_layouts);
+			layout_children_linear(available_bounds, Axis::Horizontal, Align::Start, &[widget_id], &widget_constraints, widget_layouts);
 		}
 
 		// top down resolve layouts and assign rects
 		hierarchy.visit_breadth_first(None, |widget_id, children| {
 			// this widget should already be laid out or root
-			let content_bounds = self.widget_layouts[&widget_id].content_bounds;
+			let content_bounds = widget_layouts[&widget_id].content_bounds;
 			let constraints = &widget_constraints[&widget_id];
 			let main_axis = constraints.layout_axis.get();
 			let content_alignment = constraints.content_alignment.get();
 
 			// TODO(pat.m): layout mode?
-			layout_children_linear(content_bounds, main_axis, content_alignment, children, &widget_constraints, &mut self.widget_layouts);
+			layout_children_linear(content_bounds, main_axis, content_alignment, children, &widget_constraints, widget_layouts);
 		});
 	}
 
-	fn handle_input(&mut self) {
-		// Persist widget bounds
-		let mut input_handlers = self.persistent_state.input_handlers.borrow_mut();
-		input_handlers.clear();
-
-		self.persistent_state.hierarchy.borrow()
-			.visit_breadth_first(None, |widget_id, _| {
-				// TODO(pat.m): clipping! also we probably want some per-widget configuration of input behaviour
-				let box_bounds = self.widget_layouts[&widget_id].box_bounds;
-				input_handlers.insert(widget_id, box_bounds);
-			});
-	}
-
-	fn draw(&mut self, painter: &mut Painter) {
+	fn draw(&mut self, painter: &mut Painter, widget_layouts: &LayoutMap) {
 		let mut widgets = self.persistent_state.widgets.borrow_mut();
 		let hierarchy = self.persistent_state.hierarchy.borrow();
 
@@ -295,7 +292,7 @@ impl<'ps> Ui<'ps> {
 		// draw from root to leaves
 		let null_clip_rect = Aabb2::new(Vec2::zero(), Vec2::splat(u16::MAX as f32));
 		hierarchy.visit_breadth_first_with_parent_context(null_clip_rect, |widget_id, parent_clip| {
-			let layout = &self.widget_layouts[&widget_id];
+			let layout = &widget_layouts[&widget_id];
 			let widget_state = widgets.get_mut(&widget_id).unwrap();
 
 			let clip_rect = to_4u16(&parent_clip);
@@ -308,6 +305,7 @@ impl<'ps> Ui<'ps> {
 
 				state: &mut widget_state.state,
 				input: self.input,
+				widget_id,
 			});
 
 			// Visualise clip rects
@@ -376,6 +374,7 @@ impl Ui<'_> {
 					state: &mut widget_box.state,
 					text_state,
 					input: self.input,
+					widget_id,
 				});
 
 				widgets.insert(widget_id, widget_box);
@@ -398,6 +397,7 @@ impl Ui<'_> {
 					state: &mut widget_box.state,
 					text_state,
 					input: self.input,
+					widget_id,
 				});
 			}
 		}

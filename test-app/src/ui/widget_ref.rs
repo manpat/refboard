@@ -59,7 +59,7 @@ impl<'ui, T> WidgetRef<'ui, T> {
 	}
 
 	pub fn is_hovered(&self) -> bool {
-		self.ui.persistent_state.hovered_widget.get() == Some(self.widget_id)
+		self.ui.input.hovered_widget == Some(self.widget_id)
 	}
 
 	pub fn is_clicked(&self) -> bool {

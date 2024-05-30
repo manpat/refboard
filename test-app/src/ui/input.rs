@@ -11,13 +11,16 @@ pub struct Input {
 	pub click_received: bool,
 
 	pub events_received_this_frame: bool,
+
+	pub hovered_widget: Option<ui::WidgetId>,
 }
 
 impl Input {
-	pub fn prepare_frame(&mut self) {
+	pub fn reset(&mut self) {
 		self.cursor_pos_view = None;
 		self.click_received = false;
 		self.events_received_this_frame = false;
+		self.hovered_widget = None;
 	}
 
 	pub fn process_events(&mut self, viewport: &ui::Viewport) {

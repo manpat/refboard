@@ -149,7 +149,8 @@ impl View {
 				ctx.painter.set_color([1.0, 0.0, 0.0]);
 				ctx.painter.circle(cursor_pos, 3.0);
 			}
-		}));
+		}))
+		.with_constraints(|c| c.set_size((0.0, 0.0)));
 
 		ui.pop_layout();
 	}

@@ -108,8 +108,6 @@ async fn main() -> anyhow::Result<()> {
 			Event::WindowEvent { window_id: _, event } => {
 				match event {
 					WindowEvent::RedrawRequested => {
-						ui_system.update_input();
-
 						painter.clear();
 						ui_system.run(&mut painter, |ui| {
 							view.build(ui, &app);
