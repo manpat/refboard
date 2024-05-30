@@ -334,7 +334,7 @@ impl Renderer {
 		}
 	}
 
-	pub fn prepare(&mut self, painter: &Painter, viewport: &view::Viewport, text_state: &mut ui::TextState) {
+	pub fn prepare(&mut self, painter: &Painter, viewport: &ui::Viewport, text_state: &mut ui::TextState) {
 		let vertex_bytes = bytemuck::cast_slice(&painter.geometry.vertices);
 		let index_bytes = bytemuck::cast_slice(&painter.geometry.indices);
 

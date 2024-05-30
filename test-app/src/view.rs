@@ -5,8 +5,8 @@ pub struct View {
 	// gizmo overlay
 	// menus
 
-	pub viewport: Viewport,
-	pub input: Input,
+	pub viewport: ui::Viewport,
+	pub input: ui::Input,
 	pub ui: ui::System,
 
 	should_redraw: bool,
@@ -14,11 +14,11 @@ pub struct View {
 
 impl View {
 	pub fn new() -> View {
-		let input = Input::default();
+		let input = ui::Input::default();
 		let ui = ui::System::new();
 
 		View {
-			viewport: Viewport::default(),
+			viewport: ui::Viewport::default(),
 			input,
 			ui,
 			should_redraw: true,
@@ -193,78 +193,3 @@ impl View {
 
 
 
-use winit::event::{WindowEvent, ElementState, MouseButton};
-use winit::dpi::PhysicalPosition;
-
-#[derive(Default, Debug)]
-pub struct Input {
-	raw_cursor_pos: Option<Vec2>,
-
-	pub cursor_pos_view: Option<Vec2>,
-	pub click_received: bool,
-
-	pub events_received_this_frame: bool,
-}
-
-impl Input {
-	pub fn prepare_frame(&mut self) {
-		self.cursor_pos_view = None;
-		self.click_received = false;
-		self.events_received_this_frame = false;
-	}
-
-	pub fn process_events(&mut self, viewport: &Viewport) {
-		self.cursor_pos_view = self.raw_cursor_pos
-			.map(|raw_pos| viewport.physical_to_view() * raw_pos);
-	}
-
-	pub fn send_event(&mut self, event: WindowEvent) {
-		self.events_received_this_frame = true;
-
-		match event {
-			WindowEvent::CursorMoved { position, .. } => {
-				let PhysicalPosition {x, y} = position.cast();
-				self.raw_cursor_pos = Some(Vec2::new(x, y));
-			}
-
-
-			WindowEvent::CursorLeft { .. } => {
-				self.raw_cursor_pos = None;
-			}
-
-			WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => {
-				// TODO(pat.m): better
-				self.click_received = true;
-			}
-
-			_ => {}
-		}
-	}
-}
-
-
-
-#[derive(Debug, Default)]
-pub struct Viewport {
-	pub size: Vec2,
-}
-
-impl Viewport {
-	pub fn new() -> Viewport {
-		Viewport {
-			size: Vec2::zero(),
-		}
-	}
-
-	pub fn view_to_clip(&self) -> Mat2x3 {
-		Mat2x3::scale_translate(Vec2::new(2.0, -2.0) / self.size, Vec2::new(-1.0, 1.0))
-	}
-
-	pub fn physical_to_view(&self) -> Mat2x3 {
-		Mat2x3::identity()
-	}
-
-	pub fn view_bounds(&self) -> Aabb2 {
-		Aabb2::new(Vec2::zero(), self.size)
-	}
-}

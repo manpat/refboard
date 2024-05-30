@@ -7,6 +7,8 @@ pub mod style;
 pub mod text;
 pub mod layout;
 pub mod hierarchy;
+pub mod input;
+pub mod viewport;
 
 pub use widget::*;
 pub use widgets::*;
@@ -15,8 +17,9 @@ pub use style::*;
 pub use text::*;
 pub use layout::*;
 pub use hierarchy::*;
+pub use viewport::*;
 
-use view::Input;
+pub use input::Input;
 
 use std::any::{TypeId, Any};
 use std::marker::PhantomData;
