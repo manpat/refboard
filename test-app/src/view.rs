@@ -83,6 +83,16 @@ impl View {
 			}
 
 			impl ui::Widget for Stateful {
+				fn lifecycle(&mut self, ctx: ui::LifecycleContext<'_>) {
+					let state = ctx.state.get_or_default::<StatefulState>();
+
+					state.hovered = ctx.input.hovered_widget == Some(ctx.widget_id);
+
+					if state.hovered && ctx.input.was_mouse_released(ui::MouseButton::Left) {
+						state.active = !state.active;
+					}
+				}
+
 				fn draw(&self, ctx: ui::DrawContext<'_>) {
 					let state = ctx.state.get_or_default::<StatefulState>();
 
@@ -109,13 +119,6 @@ impl View {
 
 			let widget = ui.add_widget(Stateful)
 				.with_constraints(|c| c.set_size((32.0, 32.0)));
-
-			widget.state_as::<StatefulState>().hovered = widget.is_hovered();
-
-			if widget.is_clicked() {
-				let mut state = widget.state_as::<StatefulState>();
-				state.active = !state.active;
-			}
 
 			ui.add_widget(())
 				.with_constraints(|c| match widget.is_active() {

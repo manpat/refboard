@@ -8,8 +8,8 @@ pub struct ConstraintContext<'a> {
 	pub constraints: &'a mut LayoutConstraints,
 	pub constraint_map: &'a LayoutConstraintMap,
 	pub children: &'a [WidgetId],
-	pub widget_id: WidgetId,
 
+	pub widget_id: WidgetId,
 	pub state: &'a mut StateBox,
 	pub text_state: &'a mut super::TextState,
 }
@@ -17,8 +17,8 @@ pub struct ConstraintContext<'a> {
 pub struct DrawContext<'a> {
 	pub painter: &'a mut Painter,
 	pub layout: &'a Layout,
-	pub widget_id: WidgetId,
 
+	pub widget_id: WidgetId,
 	pub state: &'a mut StateBox,
 	pub text_state: &'a mut super::TextState,
 	pub input: &'a Input,
@@ -33,15 +33,18 @@ pub enum WidgetLifecycleEvent {
 
 pub struct LifecycleContext<'a> {
 	pub event: WidgetLifecycleEvent,
-	pub state: &'a mut StateBox,
-	pub widget_id: WidgetId,
 	
+	pub widget_id: WidgetId,
+	pub state: &'a mut StateBox,
 	pub text_state: &'a mut super::TextState,
 	pub input: &'a Input,
 }
 
 
 pub trait Widget : AsAny + Debug {
+	// TODO(pat.m): configure()? could replace 'constrain' and include things like
+	// input behaviour, whether or not a widget is a drag region, should widget ignore clipping, etc
+
 	fn lifecycle(&mut self, _: LifecycleContext<'_>) {}
 	fn constrain(&self, _: ConstraintContext<'_>) {}
 	fn draw(&self, _: DrawContext<'_>) {}

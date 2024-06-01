@@ -1,7 +1,5 @@
 use crate::prelude::*;
 
-use std::cell::Cell;
-
 #[derive(Default)]
 pub struct App {
 	pub persistence: AppPersistence,

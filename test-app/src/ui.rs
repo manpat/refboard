@@ -88,9 +88,9 @@ impl System {
 
 		// TODO(pat.m): collect input behaviour from existing widgets
 
-		// TODO(pat.m): move this into Input::process_events, along with input_handlers
+		// TODO(pat.m): move this into Input::process_events
 		if let Some(cursor_pos) = self.input.cursor_pos_view {
-			let input_handlers = self.persistent_state.input_handlers.borrow();
+			let input_handlers = &self.input.registered_widgets;
 
 			// TODO(pat.m): instead of just storing the last hovered widget, store a 'stack' of hovered widgets
 			self.persistent_state.hierarchy.borrow()
@@ -107,7 +107,7 @@ impl System {
 
 	fn persist_input_bounds(&mut self) {
 		// Persist widget bounds
-		let mut input_handlers = self.persistent_state.input_handlers.borrow_mut();
+		let input_handlers = &mut self.input.registered_widgets;
 		input_handlers.clear();
 
 		self.persistent_state.hierarchy.borrow()
@@ -200,9 +200,6 @@ struct WidgetBox {
 pub struct PersistentState {
 	widgets: RefCell<HashMap<WidgetId, WidgetBox>>,
 	hierarchy: RefCell<Hierarchy>,
-
-	// TODO(pat.m): move into Input
-	input_handlers: RefCell<HashMap<WidgetId, Aabb2>>,
 }
 
 

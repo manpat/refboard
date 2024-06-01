@@ -964,6 +964,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "material-colors"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8a337c8c8d75b80c6db350ba39844f08eddf4c3fde1b83967b5ce5f3f82ff24"
+dependencies = [
+ "ahash",
+ "indexmap",
+]
+
+[[package]]
 name = "memchr"
 version = "2.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1697,6 +1707,7 @@ dependencies = [
  "cosmic-text",
  "env_logger",
  "lyon",
+ "material-colors",
  "raw-window-handle",
  "slotmap",
  "smallvec",

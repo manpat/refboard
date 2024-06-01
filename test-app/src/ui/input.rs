@@ -14,6 +14,8 @@ pub struct Input {
 
 	pub hovered_widget: Option<ui::WidgetId>,
 
+	pub registered_widgets: HashMap<ui::WidgetId, Aabb2>,
+
 	// All events that happened this frame.
 	events: Vec<InputEvent>,
 
@@ -42,6 +44,9 @@ impl Input {
 			WindowEvent::CursorMoved { position, .. } => {
 				let PhysicalPosition {x, y} = position.cast();
 				self.raw_cursor_pos = Some(Vec2::new(x, y));
+
+				// TODO(pat.m): queue mouse move events so we don't lose precision
+				// maybe this can be opt in?
 			}
 
 			WindowEvent::CursorLeft { .. } => {
@@ -144,6 +149,7 @@ impl InputEvent {
 			InputEvent::MouseUp(button) => desired_button == *button,
 			InputEvent::MouseDown(button) => desired_button == *button,
 
+			#[allow(unreachable_patterns)]
 			_ => false
 		}
 	}
