@@ -18,7 +18,7 @@ pub struct Painter {
 
 	color: Color,
 	uv_rect: Option<Aabb2>,
-	clip_rect: [u16; 4],
+	clip_rect: Option<Aabb2>,
 }
 
 impl Painter {
@@ -35,7 +35,7 @@ impl Painter {
 
 			color: Color::white(),
 			uv_rect: None,
-			clip_rect: [0, u16::MAX, 0, u16::MAX],
+			clip_rect: None,
 		}
 	}
 
@@ -48,7 +48,7 @@ impl Painter {
 
 		self.color = Color::white();
 		self.uv_rect = None;
-		self.clip_rect = [0, u16::MAX, 0, u16::MAX];
+		self.clip_rect = None;
 	}
 
 	fn with_stroker(&mut self, f: impl FnOnce(&mut StrokeTessellator, &StrokeOptions, &mut BuffersBuilder<'_, renderer::Vertex, u32, VertexConstructor>))
@@ -56,7 +56,7 @@ impl Painter {
 		let num_initial_verts = self.geometry.vertices.len();
 		let mut bounds = Aabb2::empty();
 
-		let mut vertex_constructor = VertexConstructor::new(self.color, self.clip_rect);
+		let mut vertex_constructor = VertexConstructor::new(self.color, to_4u16(self.clip_rect));
 		if self.uv_rect.is_some() {
 			vertex_constructor.total_rect = Some(&mut bounds);
 		}
@@ -83,7 +83,7 @@ impl Painter {
 		let num_initial_verts = self.geometry.vertices.len();
 		let mut bounds = Aabb2::empty();
 
-		let mut vertex_constructor = VertexConstructor::new(self.color, self.clip_rect);
+		let mut vertex_constructor = VertexConstructor::new(self.color, to_4u16(self.clip_rect));
 		if self.uv_rect.is_some() {
 			vertex_constructor.total_rect = Some(&mut bounds);
 		}
@@ -114,8 +114,8 @@ impl Painter {
 		self.stroke_options.line_width = width;
 	}
 
-	pub fn set_clip_rect(&mut self, clip_rect: [u16; 4]) {
-		self.clip_rect = clip_rect;
+	pub fn set_clip_rect(&mut self, clip_rect: impl Into<Option<Aabb2>>) {
+		self.clip_rect = clip_rect.into();
 	}
 
 	pub fn set_color(&mut self, color: impl Into<Color>) {
@@ -303,4 +303,16 @@ fn to_box(Aabb2{min, max}: Aabb2) -> Box2D {
 
 fn to_box_centroid(Aabb2{min, max}: Aabb2) -> Box2D {
 	Box2D::new(to_point(min.floor() + Vec2::splat(0.5)), to_point(max.floor() - Vec2::splat(0.5)))
+}
+
+fn to_4u16(bounds: impl Into<Option<Aabb2>>) -> [u16; 4] {
+	let Some(bounds) = bounds.into() else {
+		return [0, u16::MAX, 0, u16::MAX]
+	};
+
+	let min_x = bounds.min.x.round().clamp(0.0, u16::MAX as f32) as i32 as u16;
+	let max_x = bounds.max.x.round().clamp(0.0, u16::MAX as f32) as i32 as u16;
+	let min_y = bounds.min.y.round().clamp(0.0, u16::MAX as f32) as i32 as u16;
+	let max_y = bounds.max.y.round().clamp(0.0, u16::MAX as f32) as i32 as u16;
+	[min_x, max_x, min_y, max_y]
 }

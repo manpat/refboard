@@ -144,8 +144,7 @@ impl View {
 		});
 
 		ui.add_widget(ui::DrawFnWidget(|ctx| {
-			// TODO(pat.m): yuck
-			ctx.painter.set_clip_rect([0, 65535, 0, 65535]);
+			ctx.painter.set_clip_rect(None);
 
 			// Cursor
 			if let Some(cursor_pos) = ctx.input.cursor_pos_view {
