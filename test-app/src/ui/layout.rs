@@ -610,6 +610,7 @@ pub struct Layout {
 	pub box_bounds: Aabb2,
 	pub margin_bounds: Aabb2,
 	pub content_bounds: Aabb2,
+	pub clip_rect: Option<Aabb2>,
 
 	final_size: bool,
 }
@@ -623,6 +624,7 @@ impl Default for Layout {
 			box_bounds: Aabb2::zero(),
 			margin_bounds: Aabb2::zero(),
 			content_bounds: Aabb2::zero(),
+			clip_rect: None,
 
 			final_size: false,
 		}

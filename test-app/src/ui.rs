@@ -277,24 +277,42 @@ impl<'ps> Ui<'ps> {
 			// TODO(pat.m): layout mode?
 			layout_children_linear(content_bounds, main_axis, content_alignment, children, &widget_constraints, widget_layouts);
 		});
+
+		// Calculate clip rects
+		hierarchy.visit_breadth_first_with_parent_context(None, |widget_id, parent_clip| {
+			let layout = widget_layouts.get_mut(&widget_id).unwrap();
+			layout.clip_rect = parent_clip;
+
+			let clip_rect = match parent_clip {
+				Some(parent_clip) => clip_rects(&layout.box_bounds, &parent_clip),
+				None => layout.box_bounds,
+			};
+
+			Some(clip_rect)
+		});
+
+		// TODO(pat.m): why is this not on Aabb2
+		fn clip_rects(lhs: &Aabb2, rhs: &Aabb2) -> Aabb2 {
+			Aabb2 {
+				min: Vec2::new(lhs.min.x.max(rhs.min.x), lhs.min.y.max(rhs.min.y)),
+				max: Vec2::new(lhs.max.x.min(rhs.max.x), lhs.max.y.min(rhs.max.y)),
+			}
+		}
 	}
 
 	fn draw(&mut self, painter: &mut Painter, widget_layouts: &LayoutMap) {
 		let mut widgets = self.persistent_state.widgets.borrow_mut();
 		let hierarchy = self.persistent_state.hierarchy.borrow();
 
-		// TODO(pat.m): this is yucky - maybe we should actually calculate clip rects during layout?
-		// TODO(pat.m): also we may eventually want widgets to be able to ignore the parent clip rect
-
 		let mut text_state = self.text_state.borrow_mut();
 		let text_state = &mut *text_state;
 
 		// draw from root to leaves
-		hierarchy.visit_breadth_first_with_parent_context(None, |widget_id, parent_clip| {
+		hierarchy.visit_breadth_first(None, |widget_id, _| {
 			let layout = &widget_layouts[&widget_id];
 			let widget_state = widgets.get_mut(&widget_id).unwrap();
 
-			painter.set_clip_rect(parent_clip);
+			painter.set_clip_rect(layout.clip_rect);
 			widget_state.widget.draw(DrawContext {
 				painter,
 				layout,
@@ -304,26 +322,19 @@ impl<'ps> Ui<'ps> {
 				input: self.input,
 				widget_id,
 			});
-
-			// Visualise clip rects
-			if let Some(parent_clip) = parent_clip {
-				painter.set_clip_rect(None);
-				painter.set_color(Color::white());
-				painter.rect_outline(parent_clip);
-			}
-
-			match parent_clip {
-				Some(parent_clip) => Some(clip_rects(&layout.box_bounds, &parent_clip)),
-				None => Some(layout.box_bounds),
-			}
 		});
 
-		// TODO(pat.m): why is this not on Aabb2
-		fn clip_rects(lhs: &Aabb2, rhs: &Aabb2) -> Aabb2 {
-			Aabb2 {
-				min: Vec2::new(lhs.min.x.max(rhs.min.x), lhs.min.y.max(rhs.min.y)),
-				max: Vec2::new(lhs.max.x.min(rhs.max.x), lhs.max.y.min(rhs.max.y)),
-			}
+		// Visualise clip rects
+		// TODO(pat.m): make this a debug setting
+		if false {
+			painter.set_clip_rect(None);
+			painter.set_color(Color::white());
+
+			hierarchy.visit_breadth_first(None, |widget_id, _| {
+				if let Some(clip) = widget_layouts[&widget_id].clip_rect {
+					painter.rect_outline(clip);
+				}
+			});
 		}
 	}
 }
