@@ -67,6 +67,8 @@ impl Input {
 				self.events.push(InputEvent::MouseDown(button));
 				self.mouse_states.insert(button, true);
 
+				// TODO(pat.m): shouldn't just use hovered_widget, but should
+				// pick first widget in hover stack that handles event
 				if let Some(widget_id) = self.hovered_widget
 				&& let Some(reg) = self.registered_widgets.get(&widget_id)
 				&& reg.behaviour.contains(InputBehaviour::WINDOW_DRAG_ZONE)
