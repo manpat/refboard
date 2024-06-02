@@ -4,6 +4,13 @@ use super::{WidgetId, Input, StateBox, Layout, LayoutConstraints, LayoutConstrai
 use std::fmt::Debug;
 
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum WidgetLifecycleEvent {
+	Created,
+	Updated,
+	Destroyed,
+}
+
 pub struct ConstraintContext<'a> {
 	pub constraints: &'a mut LayoutConstraints,
 	pub constraint_map: &'a LayoutConstraintMap,
@@ -22,13 +29,6 @@ pub struct DrawContext<'a> {
 	pub state: &'a mut StateBox,
 	pub text_state: &'a mut super::TextState,
 	pub input: &'a Input,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum WidgetLifecycleEvent {
-	Created,
-	Updated,
-	Destroyed,
 }
 
 pub struct LifecycleContext<'a> {
@@ -63,5 +63,21 @@ impl dyn Widget {
 	pub fn as_widget_mut<T: Widget>(&mut self) -> Option<&mut T> {
 		(*self).as_any_mut()
 			.downcast_mut::<T>()
+	}
+}
+
+
+
+pub trait StatefulWidget : Widget {
+	type State: 'static;
+
+	fn get_state<'s>(&self, state_box: &'s mut StateBox) -> &'s mut Self::State {
+		state_box.get()
+	}
+
+	fn get_state_or_default<'s>(&self, state_box: &'s mut StateBox) -> &'s mut Self::State
+		where Self::State: Default
+	{
+		state_box.get_or_default()
 	}
 }

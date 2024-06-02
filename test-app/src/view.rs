@@ -73,6 +73,8 @@ impl View {
 
 
 		ui.with_horizontal_layout(|| {
+			use ui::StatefulWidget;
+
 			#[derive(Default, Debug)]
 			struct Stateful;
 
@@ -82,9 +84,13 @@ impl View {
 				hovered: bool,
 			}
 
+			impl ui::StatefulWidget for Stateful {
+				type State = StatefulState;
+			}
+
 			impl ui::Widget for Stateful {
 				fn lifecycle(&mut self, ctx: ui::LifecycleContext<'_>) {
-					let state = ctx.state.get_or_default::<StatefulState>();
+					let state = self.get_state_or_default(ctx.state);
 
 					state.hovered = ctx.input.hovered_widget == Some(ctx.widget_id);
 
@@ -94,7 +100,7 @@ impl View {
 				}
 
 				fn draw(&self, ctx: ui::DrawContext<'_>) {
-					let state = ctx.state.get_or_default::<StatefulState>();
+					let state = self.get_state_or_default(ctx.state);
 
 					let color = match (state.active, state.hovered) {
 						(true, false) => Color::green(),
@@ -113,7 +119,7 @@ impl View {
 			#[allow(non_local_definitions)]
 			impl ui::WidgetRef<'_, Stateful> {
 				fn is_active(&self) -> bool {
-					self.state_as::<StatefulState>().active
+					self.state_or_default().active
 				}
 			}
 

@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use super::{WidgetId, Widget, Ui, StateBox, LayoutConstraints};
+use super::{WidgetId, Widget, StatefulWidget, Ui, StateBox, LayoutConstraints};
 
 use std::cell::RefMut;
 use std::marker::PhantomData;
@@ -32,14 +32,14 @@ impl<'ui, T> WidgetRef<'ui, T> {
 		RefMut::map(self.widget_box().0, |w| w.as_widget_mut().unwrap())
 	}
 
-	pub fn state(&self) -> RefMut<'ui, StateBox> {
+	pub fn any_state(&self) -> RefMut<'ui, StateBox> {
 		self.widget_box().1
 	}
 
 	pub fn state_as<S>(&self) -> RefMut<'ui, S>
 		where S: Default + 'static
 	{
-		RefMut::map(self.state(), |s| s.get_or_default())
+		RefMut::map(self.any_state(), |s| s.get_or_default())
 	}
 
 	pub fn constraints(&self) -> RefMut<'ui, LayoutConstraints> {
@@ -68,6 +68,16 @@ impl<'ui, T> WidgetRef<'ui, T> {
 	}
 
 	// TODO(pat.m): is focussed
+}
+
+impl<'ui, T> WidgetRef<'ui, T>
+	where T: StatefulWidget
+{
+	pub fn state_or_default(&self) -> RefMut<'ui, T::State>
+		where T::State: Default
+	{
+		self.state_as()
+	}
 }
 
 impl<'ui, T> From<&'_ WidgetRef<'ui, T>> for WidgetId {

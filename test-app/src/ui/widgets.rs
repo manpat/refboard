@@ -261,8 +261,12 @@ pub struct Text {
 }
 
 #[derive(Debug)]
-struct TextState {
+pub struct TextWidgetState {
 	buffer: cosmic_text::Buffer,
+}
+
+impl StatefulWidget for Text {
+	type State = TextWidgetState;
 }
 
 impl Widget for Text {
@@ -279,10 +283,10 @@ impl Widget for Text {
 			let mut buffer = cosmic_text::Buffer::new(font_system, metrics);
 			buffer.set_size(font_system, 1000.0, 1000.0);
 			buffer.set_wrap(font_system, cosmic_text::Wrap::None);
-			ctx.state.set(TextState {buffer});
+			ctx.state.set(TextWidgetState {buffer});
 		}
 
-		let state = ctx.state.get::<TextState>();
+		let state = self.get_state(ctx.state);
 		let mut buffer = state.buffer.borrow_with(font_system);
 
 		// if ctx.event == WidgetLifecycleEvent::Updated {
@@ -294,8 +298,9 @@ impl Widget for Text {
 	}
 
 	fn constrain(&self, ctx: ConstraintContext<'_>) {
+		let state = self.get_state(ctx.state);
+
 		if !ctx.constraints.min_width.is_set() {
-			let state = ctx.state.get::<TextState>();
 			let buffer = state.buffer.borrow_with(&mut ctx.text_state.font_system);
 
 			let min_width = buffer.layout_runs()
@@ -307,7 +312,6 @@ impl Widget for Text {
 		}
 
 		if !ctx.constraints.min_height.is_set() {
-			let state = ctx.state.get::<TextState>();
 			let buffer = state.buffer.borrow_with(&mut ctx.text_state.font_system);
 
 			let min_height = buffer.lines.len() as f32 * HACK_LINE_HEIGHT;
@@ -320,7 +324,7 @@ impl Widget for Text {
 	}
 
 	fn draw(&self, ctx: DrawContext<'_>) {
-		let state = ctx.state.get::<TextState>();
+		let state = self.get_state(ctx.state);
 
 		let font_system = &mut ctx.text_state.font_system;
 
