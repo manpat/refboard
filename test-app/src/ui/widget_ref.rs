@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use super::{WidgetId, Widget, StatefulWidget, Ui, StateBox, LayoutConstraints};
+use super::{WidgetId, Widget, StatefulWidget, InputBehaviour, Ui, StateBox, LayoutConstraints};
 
 use std::cell::RefMut;
 use std::marker::PhantomData;
@@ -23,6 +23,14 @@ impl<'ui, T> WidgetRef<'ui, T> {
 	{
 		let (mut widget, mut state) = self.widget_box();
 		mutate(widget.as_widget_mut().unwrap(), &mut *state);
+		self
+	}
+
+	pub fn with_input_behaviour(self, input_behaviour: InputBehaviour) -> Self
+		where T: Widget
+	{
+		let mut widgets = self.ui.persistent_state.widgets.borrow_mut();
+		widgets.get_mut(&self.widget_id).unwrap().input_behaviour = input_behaviour;
 		self
 	}
 

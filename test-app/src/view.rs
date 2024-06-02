@@ -14,7 +14,7 @@ impl View {
 
 	pub fn build(&mut self, ui: &ui::Ui<'_>, app: &app::App) {
 		ui.push_layout(
-			ui.add_widget(ui::FrameWidget::vertical())
+			ui.add_widget(ui::FrameWidget::vertical().with_color(Color::grey(0.02)))
 				.with_constraints(|c| c.set_size_policy(ui::SizingBehaviour::FLEXIBLE))
 		);
 
@@ -26,8 +26,9 @@ impl View {
 		})
 		.with_constraints(|c| c.self_alignment.set(ui::Align::End));
 
-		ui.text("Now I'm centre aligned")
-			.with_constraints(|c| c.self_alignment.set(ui::Align::Middle));
+		ui.text("Now I'm centre aligned (drag me)")
+			.with_constraints(|c| c.self_alignment.set(ui::Align::Middle))
+			.with_input_behaviour(ui::InputBehaviour::WINDOW_DRAG_ZONE);
 
 		let add_widget = |idx| {
 			let frame = ui.add_widget(ui::FrameWidget::horizontal().with_color(Color::green().with_alpha(0.2)));

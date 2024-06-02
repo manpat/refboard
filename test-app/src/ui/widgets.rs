@@ -30,7 +30,7 @@ impl Ui<'_> {
 
 
 impl Widget for () {
-	fn constrain(&self, ctx: ConstraintContext<'_>) {
+	fn configure(&self, ctx: ConfigureContext<'_>) {
 		ctx.constraints.margin.set_default(4.0);
 		ctx.constraints.padding.set_default(8.0);
 
@@ -88,8 +88,8 @@ impl BoxLayout {
 }
 
 impl Widget for BoxLayout {
-	fn constrain(&self, ctx: ConstraintContext<'_>) {
-		let ConstraintContext { constraints, children, constraint_map, .. } = ctx;
+	fn configure(&self, ctx: ConfigureContext<'_>) {
+		let ConfigureContext { constraints, children, constraint_map, .. } = ctx;
 
 		constraints.layout_axis.set_default(self.axis);
 
@@ -178,12 +178,12 @@ impl FrameWidget<BoxLayout> {
 impl<W> Widget for FrameWidget<W>
 	where W: Widget
 {
-	fn constrain(&self, ctx: ConstraintContext<'_>) {
-		self.inner.constrain(ctx);
+	fn configure(&self, ctx: ConfigureContext<'_>) {
+		self.inner.configure(ctx);
 	}
 
 	fn draw(&self, ctx: DrawContext<'_>) {
-		let rounding = 4.0;
+		let rounding = 8.0;
 
 		ctx.painter.set_color(self.background_color);
 		ctx.painter.rounded_rect(ctx.layout.box_bounds, rounding);
@@ -202,7 +202,7 @@ impl<W> Widget for FrameWidget<W>
 pub struct Spring(pub Axis);
 
 impl Widget for Spring {
-	fn constrain(&self, ctx: ConstraintContext<'_>) {
+	fn configure(&self, ctx: ConfigureContext<'_>) {
 		ctx.constraints.size_policy_mut(self.0).set_default(SizingBehaviour::FLEXIBLE);
 		ctx.constraints.size_policy_mut(self.0.opposite()).set_default(SizingBehaviour::FIXED);
 		ctx.constraints.self_alignment.set_default(Align::Middle);
@@ -215,7 +215,7 @@ impl Widget for Spring {
 pub struct Button;
 
 impl Widget for Button {
-	fn constrain(&self, ctx: ConstraintContext<'_>) {
+	fn configure(&self, ctx: ConfigureContext<'_>) {
 		ctx.constraints.padding.set_default(8.0);
 		ctx.constraints.margin.set_default(4.0);
 
@@ -297,7 +297,7 @@ impl Widget for Text {
 		buffer.set_text(&self.text, attrs, cosmic_text::Shaping::Advanced);
 	}
 
-	fn constrain(&self, ctx: ConstraintContext<'_>) {
+	fn configure(&self, ctx: ConfigureContext<'_>) {
 		let state = self.get_state(ctx.state);
 
 		if !ctx.constraints.min_width.is_set() {

@@ -14,7 +14,7 @@ pub struct Input {
 
 	pub hovered_widget: Option<ui::WidgetId>,
 
-	pub registered_widgets: HashMap<ui::WidgetId, Aabb2>,
+	pub registered_widgets: HashMap<ui::WidgetId, RegisteredWidget>,
 
 	// All events that happened this frame.
 	events: Vec<InputEvent>,
@@ -29,7 +29,6 @@ impl Input {
 
 		self.cursor_pos_view = None;
 		self.events_received_this_frame = false;
-		self.hovered_widget = None;
 	}
 
 	pub fn process_events(&mut self, viewport: &ui::Viewport) {
@@ -37,7 +36,7 @@ impl Input {
 			.map(|raw_pos| viewport.physical_to_view() * raw_pos);
 	}
 
-	pub fn send_event(&mut self, event: WindowEvent) {
+	pub fn send_event(&mut self, event: WindowEvent) -> SendEventResponse {
 		self.events_received_this_frame = true;
 
 		match event {
@@ -61,9 +60,18 @@ impl Input {
 			}
 
 			WindowEvent::MouseInput { state: ElementState::Pressed, button, .. } => {
-				if let Some(button) = MouseButton::try_from_winit(button) {
-					self.events.push(InputEvent::MouseDown(button));
-					self.mouse_states.insert(button, true);
+				let Some(button) = MouseButton::try_from_winit(button) else {
+					return SendEventResponse::None
+				};
+
+				self.events.push(InputEvent::MouseDown(button));
+				self.mouse_states.insert(button, true);
+
+				if let Some(widget_id) = self.hovered_widget
+				&& let Some(reg) = self.registered_widgets.get(&widget_id)
+				&& reg.behaviour.contains(InputBehaviour::WINDOW_DRAG_ZONE)
+				{
+					return SendEventResponse::DragWindow
 				}
 
 				// TODO(pat.m): immediately test interactive regions from prev frame
@@ -73,7 +81,15 @@ impl Input {
 
 			_ => {}
 		}
+
+		SendEventResponse::None
 	}
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum SendEventResponse {
+	None,
+	DragWindow,
 }
 
 
@@ -153,4 +169,26 @@ impl InputEvent {
 			_ => false
 		}
 	}
+}
+
+
+
+bitflags! {
+	#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+	pub struct InputBehaviour : u32 {
+		// TODO(pat.m): handles left/right/etc mouse events
+		// TODO(pat.m): handles scroll events?
+		// TODO(pat.m): handles key events/ime?
+		// TODO(pat.m): draggable? focusable?
+		// TODO(pat.m): capture on mouse down? maybe this should be implicit
+		// TODO(pat.m): ignores clipping?
+
+		const WINDOW_DRAG_ZONE = 1<<10;
+	}
+}
+
+#[derive(Debug)]
+pub struct RegisteredWidget {
+	pub bounds: Aabb2,
+	pub behaviour: InputBehaviour,
 }

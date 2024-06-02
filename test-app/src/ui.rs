@@ -95,7 +95,7 @@ impl System {
 			// TODO(pat.m): instead of just storing the last hovered widget, store a 'stack' of hovered widgets
 			self.persistent_state.hierarchy.borrow()
 				.visit_breadth_first(None, |widget_id, _| {
-					if input_handlers[&widget_id].contains_point(cursor_pos) {
+					if input_handlers[&widget_id].bounds.contains_point(cursor_pos) {
 						self.input.hovered_widget = Some(widget_id);
 					}
 				});
@@ -108,13 +108,24 @@ impl System {
 	fn persist_input_bounds(&mut self) {
 		// Persist widget bounds
 		let input_handlers = &mut self.input.registered_widgets;
+		let widgets = self.persistent_state.widgets.get_mut();
+
 		input_handlers.clear();
 
 		self.persistent_state.hierarchy.borrow()
 			.visit_breadth_first(None, |widget_id, _| {
 				// TODO(pat.m): clipping! also we probably want some per-widget configuration of input behaviour
 				let box_bounds = self.widget_layouts[&widget_id].box_bounds;
-				input_handlers.insert(widget_id, box_bounds);
+				let widget_state = widgets.get_mut(&widget_id).unwrap();
+
+				input_handlers.insert(widget_id, RegisteredWidget {
+					bounds: box_bounds,
+					behaviour: widget_state.input_behaviour,
+				});
+
+				// Reset for next frame
+				// TODO(pat.m): yuck
+				widget_state.input_behaviour = InputBehaviour::empty();
 			});
 	}
 
@@ -193,6 +204,9 @@ struct WidgetBox {
 	// TODO(pat.m): we don't actually really need this across frames
 	widget: Box<dyn Widget>,
 	state: StateBox,
+
+	// TODO(pat.m): this shouldn't really be retained, just not sure where to put it
+	input_behaviour: InputBehaviour,
 }
 
 
@@ -246,10 +260,14 @@ impl<'ps> Ui<'ps> {
 			let children = hierarchy.children(widget_id);
 
 			let widget_state = widgets.get_mut(&widget_id).unwrap();
-			widget_state.widget.constrain(ConstraintContext {
+
+			widget_state.widget.configure(ConfigureContext {
 				constraints: &mut constraints,
 				children,
 				constraint_map: &mut widget_constraints,
+
+				// NOTE: We're relying on this being reset in persist_input_bounds
+				input_behaviour: &mut widget_state.input_behaviour,
 
 				state: &mut widget_state.state,
 				text_state,
@@ -373,6 +391,7 @@ impl Ui<'_> {
 				let mut widget_box = WidgetBox {
 					widget: Box::new(widget),
 					state: StateBox(None),
+					input_behaviour: InputBehaviour::empty(),
 				};
 
 				widget_box.widget.lifecycle(LifecycleContext {

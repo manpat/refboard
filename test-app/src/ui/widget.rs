@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use super::{WidgetId, Input, StateBox, Layout, LayoutConstraints, LayoutConstraintMap};
+use super::{WidgetId, Input, InputBehaviour, StateBox, Layout, LayoutConstraints, LayoutConstraintMap};
 
 use std::fmt::Debug;
 
@@ -11,10 +11,12 @@ pub enum WidgetLifecycleEvent {
 	Destroyed,
 }
 
-pub struct ConstraintContext<'a> {
+pub struct ConfigureContext<'a> {
 	pub constraints: &'a mut LayoutConstraints,
 	pub constraint_map: &'a LayoutConstraintMap,
 	pub children: &'a [WidgetId],
+
+	pub input_behaviour: &'a mut InputBehaviour,
 
 	pub widget_id: WidgetId,
 	pub state: &'a mut StateBox,
@@ -42,11 +44,8 @@ pub struct LifecycleContext<'a> {
 
 
 pub trait Widget : AsAny + Debug {
-	// TODO(pat.m): configure()? could replace 'constrain' and include things like
-	// input behaviour, whether or not a widget is a drag region, should widget ignore clipping, etc
-
 	fn lifecycle(&mut self, _: LifecycleContext<'_>) {}
-	fn constrain(&self, _: ConstraintContext<'_>) {}
+	fn configure(&self, _: ConfigureContext<'_>) {}
 	fn draw(&self, _: DrawContext<'_>) {}
 }
 

@@ -3,7 +3,7 @@
 use winit::{
 	event::{Event, WindowEvent, StartCause},
 	event_loop::{EventLoop, ControlFlow},
-	window::{WindowBuilder, WindowLevel},
+	window::{Window, WindowLevel},
 };
 
 use std::sync::Arc;
@@ -47,11 +47,11 @@ async fn main() -> anyhow::Result<()> {
 
 	let event_loop = EventLoop::new()?;
 
-	let window_builder = WindowBuilder::new()
+	let window_attributes = Window::default_attributes()
 		.with_title("refboard")
 		.with_resizable(true)
-		// .with_transparent(true) // Doesn't work
-		// .with_decorations(false)
+		.with_transparent(true) // Doesn't work on windows
+		.with_decorations(false)
 		.with_window_level(WindowLevel::AlwaysOnTop)
 		.with_visible(false);
 
@@ -60,7 +60,9 @@ async fn main() -> anyhow::Result<()> {
 	// 	window_builder = window_builder.with_no_redirection_bitmap(true);
 	// }
 
-	let window = Arc::new(window_builder.build(&event_loop)?);
+	// TODO(pat.m): rewrite all this shit again for winit 0.30
+	#[allow(deprecated)]
+	let window = Arc::new(event_loop.create_window(window_attributes)?);
 
 	// #[cfg(windows)]
 	// unsafe {
@@ -92,10 +94,16 @@ async fn main() -> anyhow::Result<()> {
 
 	event_loop.set_control_flow(ControlFlow::Wait);
 
+	// TODO(pat.m): rewrite all this shit again for winit 0.30
+	#[allow(deprecated)]
 	event_loop.run(move |event, target| {
 		match event {
 			// Initial present/show window
 			Event::NewEvents(StartCause::Init) => {
+				ui_system.run(&mut painter, |ui| {
+					view.build(ui, &app);
+				});
+
 				renderer.prepare(&painter, &ui_system.viewport, &mut *ui_system.text_state.borrow_mut());
 
 				window.pre_present_notify();
@@ -143,7 +151,15 @@ async fn main() -> anyhow::Result<()> {
 						| WindowEvent::MouseWheel{..}
 						| WindowEvent::KeyboardInput{..}
 					=> {
-						ui_system.input.send_event(event);
+						match ui_system.input.send_event(event) {
+							ui::SendEventResponse::DragWindow => {
+								if let Err(err) = window.drag_window() {
+									println!("Window drag failed {err}");
+								}
+							}
+
+							_ => {}
+						}
 					}
 
 					_ => {}
