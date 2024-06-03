@@ -158,6 +158,12 @@ async fn main() -> anyhow::Result<()> {
 								}
 							}
 
+							ui::SendEventResponse::DragResizeWindow => {
+								if let Err(err) = window.drag_resize_window(winit::window::ResizeDirection::SouthEast) {
+									println!("Window drag resize failed {err}");
+								}
+							}
+
 							_ => {}
 						}
 					}
@@ -167,6 +173,8 @@ async fn main() -> anyhow::Result<()> {
 			}
 
 			Event::AboutToWait => {
+				use winit::dpi::PhysicalSize;
+
 				if app.hack_changed.get() {
 					app.hack_changed.set(false);
 					window.request_redraw();
@@ -175,6 +183,9 @@ async fn main() -> anyhow::Result<()> {
 				if ui_system.should_redraw() {
 					window.request_redraw();
 				}
+
+				let Vec2{x, y} = ui_system.min_size;
+				window.set_min_inner_size(Some(PhysicalSize::new(x as u32, y as u32)));
 			}
 
 			_ => {}

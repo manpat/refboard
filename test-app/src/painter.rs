@@ -2,8 +2,10 @@ use crate::prelude::*;
 
 use lyon::math::{Point, Box2D};
 use lyon::path::{Path, PathBuffer, Winding as PathWinding};
-use lyon::path::builder::{PathBuilder, BorderRadii};
+use lyon::path::builder::PathBuilder;
 use lyon::tessellation::*;
+
+pub use lyon::path::builder::BorderRadii;
 
 
 pub struct Painter {

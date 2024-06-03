@@ -28,6 +28,7 @@ pub struct System {
 	pub viewport: Viewport,
 	pub input: Input,
 	pub text_state: RefCell<TextState>,
+	pub min_size: Vec2,
 
 	persistent_state: PersistentState,
 	should_redraw: bool,
@@ -41,6 +42,7 @@ impl System {
 			viewport: Viewport::default(),
 			input: Input::default(),
 			text_state: TextState::new().into(),
+			min_size: Vec2::zero(),
 
 			persistent_state: PersistentState::default(),
 			should_redraw: true,
@@ -79,6 +81,8 @@ impl System {
 
 		ui.layout(self.viewport.view_bounds(), &mut self.widget_layouts);
 		ui.draw(painter, &self.widget_layouts);
+
+		self.min_size = ui.calc_min_size();
 
 		self.persist_input_bounds();
 	}
@@ -201,7 +205,6 @@ impl StateBox {
 
 #[derive(Debug)]
 struct WidgetBox {
-	// TODO(pat.m): we don't actually really need this across frames
 	widget: Box<dyn Widget>,
 	state: StateBox,
 
@@ -355,6 +358,22 @@ impl<'ps> Ui<'ps> {
 			});
 		}
 	}
+
+	fn calc_min_size(&self) -> Vec2 {
+		let widget_constraints = self.widget_constraints.borrow();
+		let hierarchy = self.persistent_state.hierarchy.borrow();
+
+		let mut min_width = 10.0;
+		let mut min_height = 10.0;
+
+		for widget_id in hierarchy.children(None) {
+			let constraints = &widget_constraints[widget_id];
+			min_width = constraints.min_width.get().max(min_width);
+			min_height = constraints.min_height.get().max(min_height);
+		}
+
+		Vec2::new(min_width, min_height)
+	}
 }
 
 
@@ -462,5 +481,13 @@ impl Ui<'_> {
 
 	pub fn with_vertical_layout(&self, f: impl FnOnce()) -> WidgetRef<'_, BoxLayout> {
 		self.with_parent_widget(BoxLayout::vertical(), f)
+	}
+
+	pub fn with_horizontal_frame(&self, f: impl FnOnce()) -> WidgetRef<'_, FrameWidget<BoxLayout>> {
+		self.with_parent_widget(FrameWidget::horizontal(), f)
+	}
+
+	pub fn with_vertical_frame(&self, f: impl FnOnce()) -> WidgetRef<'_, FrameWidget<BoxLayout>> {
+		self.with_parent_widget(FrameWidget::vertical(), f)
 	}
 }

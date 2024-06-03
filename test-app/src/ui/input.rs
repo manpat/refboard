@@ -71,9 +71,12 @@ impl Input {
 				// pick first widget in hover stack that handles event
 				if let Some(widget_id) = self.hovered_widget
 				&& let Some(reg) = self.registered_widgets.get(&widget_id)
-				&& reg.behaviour.contains(InputBehaviour::WINDOW_DRAG_ZONE)
 				{
-					return SendEventResponse::DragWindow
+					if reg.behaviour.contains(InputBehaviour::WINDOW_DRAG_ZONE) {
+						return SendEventResponse::DragWindow
+					} else if reg.behaviour.contains(InputBehaviour::WINDOW_DRAG_RESIZE_ZONE) {
+						return SendEventResponse::DragResizeWindow
+					}
 				}
 
 				// TODO(pat.m): immediately test interactive regions from prev frame
@@ -92,6 +95,7 @@ impl Input {
 pub enum SendEventResponse {
 	None,
 	DragWindow,
+	DragResizeWindow,
 }
 
 
@@ -186,6 +190,7 @@ bitflags! {
 		// TODO(pat.m): ignores clipping?
 
 		const WINDOW_DRAG_ZONE = 1<<10;
+		const WINDOW_DRAG_RESIZE_ZONE = 1<<11;
 	}
 }
 
