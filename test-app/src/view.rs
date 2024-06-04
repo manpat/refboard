@@ -15,29 +15,18 @@ impl View {
 		ui.with_vertical_frame(|| {
 			self.draw_menu_bar(ui);
 
-			ui.spring(ui::Axis::Vertical);
-
-			ui.with_horizontal_frame(|| {
-				ui.text("Resize")
-					.with_input_behaviour(ui::InputBehaviour::WINDOW_DRAG_RESIZE_ZONE);
-
-				ui.spring(ui::Axis::Horizontal);
-
-				ui.text("Resize")
-					.with_input_behaviour(ui::InputBehaviour::WINDOW_DRAG_RESIZE_ZONE);
+			ui.with_vertical_layout(|| {
+				self.draw_content(ui);
 			})
-			.with_style(|style| {
-				style.rounding = Some(painter::BorderRadii {
-					top_left: 0.0,
-					top_right: 0.0,
-					bottom_left: 8.0,
-					bottom_right: 8.0,
-				});
-			})
-			.with_constraints(|c| c.horizontal_size_policy.set(ui::SizingBehaviour::CAN_GROW));
+			.with_constraints(|c| {
+				c.set_size_policy(ui::SizingBehaviour::CAN_GROW);
+				c.min_height.set(2.0);
+			});
+
+			self.draw_status_bar(ui);
 		})
 		.with_style(|style| {
-			style.fill = Some(ui::WidgetColorRole::SurfaceContainerLowest.into());
+			style.set_fill(ui::WidgetColorRole::SurfaceContainerLowest);
 			style.rounding = Some(painter::BorderRadii::new(8.0));
 		})
 		.with_constraints(|c| {
@@ -73,6 +62,69 @@ impl View {
 			c.margin.set(0.0);
 			c.padding.set_vertical(0.0);
 			c.padding.right.set(0.0);
+		});
+	}
+
+	fn draw_status_bar(&mut self, ui: &ui::Ui<'_>) {
+		ui.with_horizontal_frame(|| {
+			ui.spring(ui::Axis::Horizontal);
+
+			ui.text("Resize")
+				.with_input_behaviour(ui::InputBehaviour::WINDOW_DRAG_RESIZE_ZONE)
+				.with_style(|s| s.set_outline(ui::WidgetColorRole::Outline))
+				.with_constraints(|c| {
+					c.padding.set(8.0);
+					c.margin.set(0.0);
+				});
+		})
+		.with_style(|style| {
+			style.rounding = Some(painter::BorderRadii {
+				top_left: 0.0,
+				top_right: 0.0,
+				bottom_left: 8.0,
+				bottom_right: 8.0,
+			});
+		})
+		.with_constraints(|c| {
+			c.horizontal_size_policy.set(ui::SizingBehaviour::CAN_GROW);
+			c.padding.set(0.0);
+		});
+	}
+
+	fn draw_content(&mut self, ui: &ui::Ui<'_>) {
+		ui.with_horizontal_layout(|| {
+			ui.button();
+			ui.button().style().set_fill(ui::WidgetColorRole::Primary);
+			ui.button().style().set_fill(ui::WidgetColorRole::Secondary);
+			ui.button().style().set_fill(ui::WidgetColorRole::Tertiary);
+
+			ui.button().style().set_fill(ui::WidgetColorRole::PrimaryContainer);
+			ui.button().style().set_fill(ui::WidgetColorRole::SecondaryContainer);
+			ui.button().style().set_fill(ui::WidgetColorRole::TertiaryContainer);
+
+			ui.button().style().set_outline(ui::WidgetColorRole::Outline);
+			ui.button().style().set_outline(ui::WidgetColorRole::OutlineVariant);
+		});
+
+		ui.with_horizontal_layout(|| {
+			ui.text("Foo").with_constraints(|c| c.padding.set(4.0));
+			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_fill(ui::WidgetColorRole::Primary);
+			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_fill(ui::WidgetColorRole::Secondary);
+			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_fill(ui::WidgetColorRole::Tertiary);
+
+			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_fill(ui::WidgetColorRole::PrimaryContainer);
+			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_fill(ui::WidgetColorRole::SecondaryContainer);
+			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_fill(ui::WidgetColorRole::TertiaryContainer);
+
+			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_fill(ui::WidgetColorRole::Surface);
+			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_fill(ui::WidgetColorRole::SurfaceContainerHighest);
+			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_fill(ui::WidgetColorRole::SurfaceContainerHigh);
+			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_fill(ui::WidgetColorRole::SurfaceContainer);
+			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_fill(ui::WidgetColorRole::SurfaceContainerLow);
+			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_fill(ui::WidgetColorRole::SurfaceContainerLowest);
+
+			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_outline(ui::WidgetColorRole::Outline);
+			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_outline(ui::WidgetColorRole::OutlineVariant);
 		});
 	}
 }

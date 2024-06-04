@@ -168,26 +168,46 @@ impl<'ps> Ui<'ps> {
 
 		let mut text_state = self.text_state.borrow_mut();
 		let text_state = &mut *text_state;
+		let app_style = &self.persistent_state.style;
 
 		// draw from root to leaves
 		hierarchy.visit_breadth_first(None, |widget_id, _| {
 			let layout = &widget_layouts[&widget_id];
+			if let Some(clip_rect) = layout.clip_rect
+				&& !rect_intersects(&clip_rect, &layout.box_bounds)
+			{
+				return
+			}
+
 			let widget_state = widgets.get_mut(&widget_id).unwrap();
+			let style = &widget_state.config.style;
 
 			painter.set_clip_rect(layout.clip_rect);
+
+			draw_default_box(painter, &layout.box_bounds, app_style, style);
+
 			widget_state.widget.draw(DrawContext {
 				painter,
 				layout,
 				text_state,
 
-				style: &widget_state.config.style,
-				app_style: &self.persistent_state.style,
+				style,
+				app_style,
 
 				state: &mut widget_state.state,
 				input: self.input,
 				widget_id,
 			});
 		});
+
+		// TODO(pat.m): why is this not on Aabb2
+		fn rect_intersects(lhs: &Aabb2, rhs: &Aabb2) -> bool {
+			!(lhs.min.x > rhs.max.x
+			|| lhs.min.y > rhs.max.y
+			|| lhs.max.x < rhs.min.x
+			|| lhs.max.y < rhs.min.y)
+		}
+
 
 		// Visualise clip rects
 		// TODO(pat.m): make this a debug setting
@@ -253,6 +273,7 @@ impl Ui<'_> {
 			NodeUpdateStatus::Added => {
 				let mut widget_box = WidgetBox {
 					widget: Box::new(widget),
+
 					state: StateBox::empty(),
 					config: WidgetConfiguration::default(),
 				};
@@ -335,5 +356,25 @@ impl Ui<'_> {
 
 	pub fn with_vertical_frame(&self, f: impl FnOnce()) -> WidgetRef<'_, FrameWidget<BoxLayout>> {
 		self.with_parent_widget(FrameWidget::vertical(), f)
+	}
+}
+
+
+
+
+fn draw_default_box(painter: &mut Painter, bounds: &Aabb2, app_style: &AppStyle, widget_style: &WidgetStyle) {
+	let rounding = widget_style.rounding(app_style);
+
+	// Fill
+	if let Some(color) = &widget_style.fill {
+		painter.set_color(color.resolve(app_style));
+		painter.rounded_rect(*bounds, rounding);
+	}
+
+	// Outline
+	if let Some(outline) = &widget_style.outline {
+		painter.set_color(outline.color.resolve(app_style));
+		painter.set_line_width(outline.width);
+		painter.rounded_rect_outline(*bounds, rounding);
 	}
 }

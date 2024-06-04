@@ -15,11 +15,53 @@ pub struct WidgetStyle {
 	pub rounding: Option<painter::BorderRadii>,
 }
 
+impl WidgetStyle {
+	pub fn set_fill(&mut self, color: impl Into<WidgetColor>) {
+		self.fill = Some(color.into());
+	}
+
+	pub fn set_outline(&mut self, outline: impl Into<WidgetOutlineStyle>) {
+		self.outline = Some(outline.into());
+	}
+}
+
+impl WidgetStyle {
+	pub fn text_color(&self, app_style: &AppStyle) -> Color {
+		app_style.resolve_color_role(self.text_color_role())
+	}
+
+	pub fn text_color_role(&self) -> WidgetColorRole {
+		match self.fill {
+			None => WidgetColorRole::OnSurface,
+			Some(WidgetColor::Role(role)) => role.on_color(),
+			Some(WidgetColor::Literal(_)) => todo!("Pick an appropriate color based on luminance"),
+		}
+	}
+
+	pub fn rounding(&self, app_style: &AppStyle) -> painter::BorderRadii {
+		match self.rounding {
+			Some(rounding) => rounding,
+			None => painter::BorderRadii::new(app_style.frame_rounding),
+		}
+	}
+}
+
 
 #[derive(Debug, Clone)]
 pub struct WidgetOutlineStyle {
 	pub color: WidgetColor,
 	pub width: f32,
+}
+
+impl<T> From<T> for WidgetOutlineStyle
+	where T: Into<WidgetColor>
+{
+	fn from(color: T) -> Self {
+		Self {
+			color: color.into(),
+			width: 1.0,
+		}
+	}
 }
 
 
@@ -47,6 +89,16 @@ pub enum WidgetColorRole {
 	OnPrimary,
 	PrimaryContainer,
 	OnPrimaryContainer,
+	
+	Secondary,
+	OnSecondary,
+	SecondaryContainer,
+	OnSecondaryContainer,
+	
+	Tertiary,
+	OnTertiary,
+	TertiaryContainer,
+	OnTertiaryContainer,
 
 	Surface,
 	OnSurface,
@@ -59,6 +111,25 @@ pub enum WidgetColorRole {
 
 	Outline,
 	OutlineVariant,
+}
+
+impl WidgetColorRole {
+	fn on_color(&self) -> Self {
+		use WidgetColorRole::*;
+
+		match self {
+			Primary => OnPrimary,
+			PrimaryContainer => OnPrimaryContainer,
+
+			Secondary => OnSecondary,
+			SecondaryContainer => OnSecondaryContainer,
+			
+			Tertiary => OnTertiary,
+			TertiaryContainer => OnTertiaryContainer,
+
+			_ => OnSurface,
+		}
+	}
 }
 
 
@@ -84,10 +155,12 @@ pub struct AppStyle {
 
 impl AppStyle {
 	pub fn new() -> AppStyle {
-		let source = Argb::from_u32(0xFFDD6688);
+		// let source = Argb::from_u32(0xFFDD6688);
+		let source = Argb::from_u32(0xFF8899dd);
+		let dark_theme = true;
 
 		AppStyle {
-			scheme: DynamicScheme::by_variant(source, &dynamic_color::Variant::Content, true, None),
+			scheme: DynamicScheme::by_variant(source, &dynamic_color::Variant::Content, dark_theme, None),
 			frame_rounding: 4.0,
 		}
 	}
@@ -100,6 +173,16 @@ impl AppStyle {
 			OnPrimary => self.scheme.on_primary(),
 			PrimaryContainer => self.scheme.primary_container(),
 			OnPrimaryContainer => self.scheme.on_primary_container(),
+
+			Secondary => self.scheme.secondary(),
+			OnSecondary => self.scheme.on_secondary(),
+			SecondaryContainer => self.scheme.secondary_container(),
+			OnSecondaryContainer => self.scheme.on_secondary_container(),
+
+			Tertiary => self.scheme.tertiary(),
+			OnTertiary => self.scheme.on_tertiary(),
+			TertiaryContainer => self.scheme.tertiary_container(),
+			OnTertiaryContainer => self.scheme.on_tertiary_container(),
 
 			Surface => self.scheme.surface(),
 			OnSurface => self.scheme.on_surface(),

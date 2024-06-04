@@ -22,7 +22,6 @@ impl Ui<'_> {
 	pub fn text(&self, s: impl Into<String>) -> WidgetRef<'_, Text> {
 		self.add_widget(Text {
 			text: s.into(),
-			color: Color::white(),
 		})
 	}
 }
@@ -177,20 +176,6 @@ impl<W> Widget for FrameWidget<W>
 	}
 
 	fn draw(&self, ctx: DrawContext<'_>) {
-		let rounding = ctx.style.rounding
-			.unwrap_or_else(|| painter::BorderRadii::new(ctx.app_style.frame_rounding));
-
-		// Fill
-		let color = ctx.style.fill.unwrap_or(WidgetColorRole::SurfaceContainer.into());
-		ctx.painter.set_color(color.resolve(ctx.app_style));
-		ctx.painter.rounded_rect(ctx.layout.box_bounds, rounding);
-
-		if let Some(outline) = &ctx.style.outline {
-			ctx.painter.set_color(outline.color.resolve(ctx.app_style));
-			ctx.painter.set_line_width(outline.width);
-			ctx.painter.rounded_rect_outline(ctx.layout.box_bounds, rounding);
-		}
-
 		self.inner.draw(ctx);
 	}
 }
@@ -216,33 +201,39 @@ pub struct Button;
 
 impl Widget for Button {
 	fn configure(&self, ctx: ConfigureContext<'_>) {
+		ctx.constraints.set_size_policy(SizingBehaviour::FIXED);
+
 		ctx.constraints.padding.set_default(8.0);
 		ctx.constraints.margin.set_default(4.0);
 
 		ctx.constraints.min_width.set_default(72.0);
 		ctx.constraints.min_height.set_default(32.0);
+
+		if ctx.style.fill.is_none() && ctx.style.outline.is_none() {
+			ctx.style.set_fill(WidgetColorRole::SecondaryContainer);
+		}
 	}
 
 	fn draw(&self, ctx: DrawContext<'_>) {
-		let rounding = 4.0;
-
 		let is_hovered = ctx.input.hovered_widget == Some(ctx.widget_id);
 
-		// TODO(pat.m): should be hot_widget/active_widget?
-		let is_down = ctx.input.is_mouse_down(ui::MouseButton::Left);
+		// Paint a state layer to convey widget state
+		if is_hovered {
+			// TODO(pat.m): should be hot_widget/active_widget?
+			let is_down = ctx.input.is_mouse_down(ui::MouseButton::Left);
 
-		let fill_color = match (is_hovered, is_down) {
-			(true, true) => Color::grey(0.3),
-			(true, false) => Color::grey(0.2),
-			(false, _) => Color::grey(0.1),
-		};
+			// TODO(pat.m): this calculation could be made elsewhere
+			let base_color = ctx.style.text_color(ctx.app_style);
+			let fill_color = match is_down {
+				true => base_color.with_alpha(0.32),
+				false => base_color.with_alpha(0.16),
+			};
 
-		ctx.painter.set_color(fill_color);
-		ctx.painter.rounded_rect(ctx.layout.box_bounds, rounding);
+			let rounding = ctx.style.rounding(ctx.app_style);
 
-		ctx.painter.set_line_width(1.0);
-		ctx.painter.set_color(Color::grey(0.2));
-		ctx.painter.rounded_rect_outline(ctx.layout.box_bounds, rounding);
+			ctx.painter.set_color(fill_color);
+			ctx.painter.rounded_rect(ctx.layout.box_bounds, rounding);
+		}
 	}
 }
 
@@ -257,7 +248,6 @@ const HACK_LINE_HEIGHT: f32 = HACK_FONT_SIZE; // 24.0;
 #[derive(Debug)]
 pub struct Text {
 	pub text: String,
-	pub color: Color,
 }
 
 #[derive(Debug)]
@@ -308,15 +298,18 @@ impl Widget for Text {
 				.max_by(|a, b| a.total_cmp(&b))
 				.unwrap_or(0.0);
 
-			ctx.constraints.min_width.set_default(min_width);
+			let padding = ctx.constraints.padding.horizontal_sum();
+
+			ctx.constraints.min_width.set_default(min_width + padding);
 		}
 
 		if !ctx.constraints.min_height.is_set() {
 			let buffer = state.buffer.borrow_with(&mut ctx.text_state.font_system);
 
 			let min_height = buffer.lines.len() as f32 * HACK_LINE_HEIGHT;
+			let padding = ctx.constraints.padding.vertical_sum();
 
-			ctx.constraints.min_height.set_default(min_height);
+			ctx.constraints.min_height.set_default(min_height + padding);
 		}
 
 		ctx.constraints.horizontal_size_policy.set_default(SizingBehaviour::FIXED);
@@ -334,6 +327,8 @@ impl Widget for Text {
 		let size = ctx.layout.content_bounds.size();
 		let start_pos = ctx.layout.content_bounds.min;
 		state.buffer.set_size(font_system, size.x, size.y);
+
+		let text_color = ctx.style.text_color(ctx.app_style);
 
 		// TODO(pat.m): move into painter
 		for run in state.buffer.layout_runs() {
@@ -354,7 +349,7 @@ impl Widget for Text {
 				let glyph_color = match (glyph.color_opt, glyph_info.is_color_bitmap) {
 					(_, true) => Color::white(),
 					(Some(ct_color), _) => Color::from(ct_color.as_rgba()).to_linear(),
-					(None, _) => self.color,
+					(None, _) => text_color,
 				};
 
 				ctx.painter.set_color(glyph_color);
