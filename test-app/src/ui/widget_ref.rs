@@ -1,10 +1,10 @@
 use crate::prelude::*;
-use super::{WidgetId, Widget, StatefulWidget, InputBehaviour, Ui, StateBox, LayoutConstraints};
+use super::*;
 
 use std::cell::RefMut;
 use std::marker::PhantomData;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 pub struct WidgetRef<'ui, T> {
 	pub widget_id: WidgetId,
 	pub ui: &'ui Ui<'ui>,
@@ -26,11 +26,16 @@ impl<'ui, T> WidgetRef<'ui, T> {
 		self
 	}
 
+	pub fn with_style(self, mutate: impl FnOnce(&mut WidgetStyle)) -> Self {
+		mutate(&mut *self.style());
+		self
+	}
+
 	pub fn with_input_behaviour(self, input_behaviour: InputBehaviour) -> Self
 		where T: Widget
 	{
 		let mut widgets = self.ui.persistent_state.widgets.borrow_mut();
-		widgets.get_mut(&self.widget_id).unwrap().input_behaviour = input_behaviour;
+		widgets.get_mut(&self.widget_id).unwrap().config.input = input_behaviour;
 		self
 	}
 
@@ -54,6 +59,20 @@ impl<'ui, T> WidgetRef<'ui, T> {
 		RefMut::map(
 			self.ui.widget_constraints.borrow_mut(),
 			|wcs| wcs.entry(self.widget_id).or_default()
+		)
+	}
+
+	pub fn style(&self) -> RefMut<'ui, WidgetStyle> {
+		RefMut::map(self.config(), |c| &mut c.style)
+	}
+
+	pub fn config(&self) -> RefMut<'ui, WidgetConfiguration> {
+		RefMut::map(
+			self.ui.persistent_state.widgets.borrow_mut(),
+			|widgets| {
+				let widget_state = widgets.get_mut(&self.widget_id).unwrap();
+				&mut widget_state.config
+			}
 		)
 	}
 

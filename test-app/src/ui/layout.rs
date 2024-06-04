@@ -1,57 +1,10 @@
 use crate::prelude::*;
-use super::{WidgetId};
+use super::{WidgetId, WidgetParameter};
 
 
 pub type LayoutConstraintMap = HashMap<WidgetId, LayoutConstraints>;
 pub type LayoutMap = HashMap<WidgetId, Layout>;
 
-
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct WidgetParameter<T> {
-	value: T,
-	set: bool,
-}
-
-impl<T> WidgetParameter<T> {
-	pub fn new(initial_value: T) -> Self {
-		WidgetParameter {
-			value: initial_value,
-			set: false,
-		}
-	}
-
-	pub fn is_set(&self) -> bool {
-		self.set
-	}
-
-	pub fn set(&mut self, value: T) {
-		self.value = value;
-		self.set = true;
-	}
-
-	pub fn set_default(&mut self, value: T) {
-		if !self.set {
-			self.value = value;
-		}
-	}
-
-	pub fn get(&self) -> T
-		where T: Copy
-	{
-		self.value
-	}
-
-	pub fn get_or(&self, default: T) -> T
-		where T: Copy
-	{
-		if self.set {
-			self.value
-		} else {
-			default
-		}
-	}
-}
 
 
 
@@ -202,6 +155,35 @@ bitflags! {
 	}
 }
 
+
+#[derive(Debug, Clone)]
+pub struct Layout {
+	pub position: Vec2,
+	pub size: Vec2,
+
+	pub box_bounds: Aabb2,
+	pub margin_bounds: Aabb2,
+	pub content_bounds: Aabb2,
+	pub clip_rect: Option<Aabb2>,
+
+	final_size: bool,
+}
+
+impl Default for Layout {
+	fn default() -> Self {
+		Layout {
+			position: Vec2::zero(),
+			size: Vec2::zero(),
+
+			box_bounds: Aabb2::zero(),
+			margin_bounds: Aabb2::zero(),
+			content_bounds: Aabb2::zero(),
+			clip_rect: None,
+
+			final_size: false,
+		}
+	}
+}
 
 #[derive(Debug, Clone)]
 pub struct LayoutConstraints {
@@ -386,7 +368,7 @@ pub fn layout_children_linear(
 		return;
 	}
 
-	// TODO(pat.m): pls use slotmaps less - this is unnecessary
+	// TODO(pat.m): :(
 	for &widget_id in widgets {
 		layouts.insert(widget_id, Layout::default());
 	}
@@ -598,35 +580,4 @@ pub fn outset_lengths(bounds: &Aabb2, lengths: &BoxLengths) -> Aabb2 {
 		Vec2::new(min.x.min(max.x), min.y.min(max.y)),
 		Vec2::new(min.x.max(max.x), min.y.max(max.y))
 	)
-}
-
-
-
-#[derive(Debug, Clone)]
-pub struct Layout {
-	pub position: Vec2,
-	pub size: Vec2,
-
-	pub box_bounds: Aabb2,
-	pub margin_bounds: Aabb2,
-	pub content_bounds: Aabb2,
-	pub clip_rect: Option<Aabb2>,
-
-	final_size: bool,
-}
-
-impl Default for Layout {
-	fn default() -> Self {
-		Layout {
-			position: Vec2::zero(),
-			size: Vec2::zero(),
-
-			box_bounds: Aabb2::zero(),
-			margin_bounds: Aabb2::zero(),
-			content_bounds: Aabb2::zero(),
-			clip_rect: None,
-
-			final_size: false,
-		}
-	}
 }

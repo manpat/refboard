@@ -151,13 +151,20 @@ impl Painter {
 	}
 
 	pub fn rounded_rect_outline(&mut self, rect: impl Into<Aabb2>, radii: impl IntoBorderRadii) {
+		let radii = radii.to_radii();
+
+		if radii.eq(&BorderRadii::new(0.0)) {
+			self.rect_outline(rect);
+			return
+		}
+
 		let rect = to_box_centroid(rect.into());
 
 		let mut scratch_path = std::mem::take(&mut self.scratch_path);
 		scratch_path.clear();
 
 		let mut builder = scratch_path.builder();
-		builder.add_rounded_rectangle(&rect, &radii.to_radii(), PathWinding::Positive, &[]);
+		builder.add_rounded_rectangle(&rect, &radii, PathWinding::Positive, &[]);
 		builder.build();
 
 		self.with_stroker(|tess, opts, builder| tess.tessellate(scratch_path.get(0).iter(), opts, builder).unwrap());
@@ -165,13 +172,20 @@ impl Painter {
 	}
 
 	pub fn rounded_rect(&mut self, rect: impl Into<Aabb2>, radii: impl IntoBorderRadii) {
+		let radii = radii.to_radii();
+
+		if radii.eq(&BorderRadii::new(0.0)) {
+			self.rect(rect);
+			return
+		}
+
 		let rect = to_box(rect.into());
 
 		let mut scratch_path = std::mem::take(&mut self.scratch_path);
 		scratch_path.clear();
 
 		let mut builder = scratch_path.builder();
-		builder.add_rounded_rectangle(&rect, &radii.to_radii(), PathWinding::Positive, &[]);
+		builder.add_rounded_rectangle(&rect, &radii, PathWinding::Positive, &[]);
 		builder.build();
 
 		self.with_filler(|tess, opts, builder| tess.tessellate(scratch_path.get(0).iter(), opts, builder).unwrap());

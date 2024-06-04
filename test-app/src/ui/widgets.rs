@@ -145,23 +145,13 @@ impl Widget for BoxLayout {
 #[derive(Debug)]
 pub struct FrameWidget<I: Widget> {
 	pub inner: I,
-
-	pub outline_color: Color,
-	pub background_color: Color,
 }
 
 impl<W: Widget> FrameWidget<W> {
 	pub fn new(inner: W) -> Self {
 		FrameWidget {
 			inner,
-			outline_color: Color::grey_a(1.0, 0.04),
-			background_color: Color::grey_a(1.0, 0.01),
 		}
-	}
-
-	pub fn with_color(mut self, color: impl Into<Color>) -> Self {
-		self.background_color = color.into();
-		self
 	}
 }
 
@@ -179,17 +169,27 @@ impl<W> Widget for FrameWidget<W>
 	where W: Widget
 {
 	fn configure(&self, ctx: ConfigureContext<'_>) {
+		if ctx.style.fill.is_none() {
+			ctx.style.fill = Some(WidgetColorRole::SurfaceContainer.into());
+		}
+
 		self.inner.configure(ctx);
 	}
 
 	fn draw(&self, ctx: DrawContext<'_>) {
-		let rounding = 8.0;
+		let rounding = ctx.style.rounding
+			.unwrap_or_else(|| painter::BorderRadii::new(ctx.app_style.frame_rounding));
 
-		ctx.painter.set_color(self.background_color);
+		// Fill
+		let color = ctx.style.fill.unwrap_or(WidgetColorRole::SurfaceContainer.into());
+		ctx.painter.set_color(color.resolve(ctx.app_style));
 		ctx.painter.rounded_rect(ctx.layout.box_bounds, rounding);
 
-		ctx.painter.set_color(self.outline_color);
-		ctx.painter.rounded_rect_outline(ctx.layout.box_bounds, rounding);
+		if let Some(outline) = &ctx.style.outline {
+			ctx.painter.set_color(outline.color.resolve(ctx.app_style));
+			ctx.painter.set_line_width(outline.width);
+			ctx.painter.rounded_rect_outline(ctx.layout.box_bounds, rounding);
+		}
 
 		self.inner.draw(ctx);
 	}

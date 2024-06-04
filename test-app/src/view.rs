@@ -26,9 +26,20 @@ impl View {
 				ui.text("Resize")
 					.with_input_behaviour(ui::InputBehaviour::WINDOW_DRAG_RESIZE_ZONE);
 			})
+			.with_style(|style| {
+				style.rounding = Some(painter::BorderRadii {
+					top_left: 0.0,
+					top_right: 0.0,
+					bottom_left: 8.0,
+					bottom_right: 8.0,
+				});
+			})
 			.with_constraints(|c| c.horizontal_size_policy.set(ui::SizingBehaviour::CAN_GROW));
 		})
-		.with_widget(|w, _| w.background_color = Color::grey(0.02))
+		.with_style(|style| {
+			style.fill = Some(ui::WidgetColorRole::SurfaceContainerLowest.into());
+			style.rounding = Some(painter::BorderRadii::new(8.0));
+		})
 		.with_constraints(|c| {
 			c.set_size_policy(ui::SizingBehaviour::CAN_GROW);
 			c.padding.set(0.0);
@@ -46,6 +57,14 @@ impl View {
 
 			ui.button()
 				.with_constraints(|c| c.set_size((32.0, 32.0)));
+		})
+		.with_style(|style| {
+			style.rounding = Some(painter::BorderRadii {
+				top_left: 8.0,
+				top_right: 8.0,
+				bottom_left: 0.0,
+				bottom_right: 0.0,
+			});
 		})
 		.with_input_behaviour(ui::InputBehaviour::WINDOW_DRAG_ZONE)
 		.with_constraints(|c| {

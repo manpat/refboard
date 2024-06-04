@@ -194,6 +194,10 @@ bitflags! {
 	}
 }
 
+impl Default for InputBehaviour {
+	fn default() -> Self { Self::empty() }
+}
+
 #[derive(Debug)]
 pub struct RegisteredWidget {
 	pub bounds: Aabb2,

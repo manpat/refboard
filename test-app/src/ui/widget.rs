@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use super::{WidgetId, Input, InputBehaviour, StateBox, Layout, LayoutConstraints, LayoutConstraintMap};
+use super::*;
 
 use std::fmt::Debug;
 
@@ -16,7 +16,8 @@ pub struct ConfigureContext<'a> {
 	pub constraint_map: &'a LayoutConstraintMap,
 	pub children: &'a [WidgetId],
 
-	pub input_behaviour: &'a mut InputBehaviour,
+	pub input: &'a mut InputBehaviour,
+	pub style: &'a mut WidgetStyle,
 
 	pub widget_id: WidgetId,
 	pub state: &'a mut StateBox,
@@ -26,6 +27,9 @@ pub struct ConfigureContext<'a> {
 pub struct DrawContext<'a> {
 	pub painter: &'a mut Painter,
 	pub layout: &'a Layout,
+
+	pub style: &'a WidgetStyle,
+	pub app_style: &'a AppStyle,
 
 	pub widget_id: WidgetId,
 	pub state: &'a mut StateBox,
