@@ -45,7 +45,8 @@ impl View {
 			ui.spring(ui::Axis::Horizontal);
 
 			ui.button()
-				.with_constraints(|c| c.set_size((32.0, 32.0)));
+				.with_constraints(|c| c.set_size((24.0, 24.0)))
+				.with_style(|s| s.set_fill(ui::WidgetColorRole::ErrorContainer));
 		})
 		.with_style(|style| {
 			style.rounding = Some(painter::BorderRadii {

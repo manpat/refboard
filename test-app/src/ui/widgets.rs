@@ -215,6 +215,8 @@ impl Widget for Button {
 	}
 
 	fn draw(&self, ctx: DrawContext<'_>) {
+		let base_color = ctx.style.text_color(ctx.app_style);
+		
 		let is_hovered = ctx.input.hovered_widget == Some(ctx.widget_id);
 
 		// Paint a state layer to convey widget state
@@ -223,7 +225,6 @@ impl Widget for Button {
 			let is_down = ctx.input.is_mouse_down(ui::MouseButton::Left);
 
 			// TODO(pat.m): this calculation could be made elsewhere
-			let base_color = ctx.style.text_color(ctx.app_style);
 			let fill_color = match is_down {
 				true => base_color.with_alpha(0.32),
 				false => base_color.with_alpha(0.16),

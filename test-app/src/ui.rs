@@ -173,6 +173,8 @@ impl<'ps> Ui<'ps> {
 		// draw from root to leaves
 		hierarchy.visit_breadth_first(None, |widget_id, _| {
 			let layout = &widget_layouts[&widget_id];
+
+			// Don't draw if not visible
 			if let Some(clip_rect) = layout.clip_rect
 				&& !rect_intersects(&clip_rect, &layout.box_bounds)
 			{

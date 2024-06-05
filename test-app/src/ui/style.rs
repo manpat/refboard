@@ -99,6 +99,11 @@ pub enum WidgetColorRole {
 	OnTertiary,
 	TertiaryContainer,
 	OnTertiaryContainer,
+	
+	Error,
+	OnError,
+	ErrorContainer,
+	OnErrorContainer,
 
 	Surface,
 	OnSurface,
@@ -126,6 +131,9 @@ impl WidgetColorRole {
 			
 			Tertiary => OnTertiary,
 			TertiaryContainer => OnTertiaryContainer,
+			
+			Error => OnError,
+			ErrorContainer => OnErrorContainer,
 
 			_ => OnSurface,
 		}
@@ -155,8 +163,8 @@ pub struct AppStyle {
 
 impl AppStyle {
 	pub fn new() -> AppStyle {
-		// let source = Argb::from_u32(0xFFDD6688);
-		let source = Argb::from_u32(0xFF8899dd);
+		let source = Argb::from_u32(0xFFDD6688);
+		// let source = Argb::from_u32(0xFF8899dd);
 		let dark_theme = true;
 
 		AppStyle {
@@ -183,6 +191,11 @@ impl AppStyle {
 			OnTertiary => self.scheme.on_tertiary(),
 			TertiaryContainer => self.scheme.tertiary_container(),
 			OnTertiaryContainer => self.scheme.on_tertiary_container(),
+
+			Error => self.scheme.error(),
+			OnError => self.scheme.on_error(),
+			ErrorContainer => self.scheme.error_container(),
+			OnErrorContainer => self.scheme.on_error_container(),
 
 			Surface => self.scheme.surface(),
 			OnSurface => self.scheme.on_surface(),
