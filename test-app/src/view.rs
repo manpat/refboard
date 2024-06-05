@@ -4,11 +4,15 @@ pub struct View {
 	// item view
 	// gizmo overlay
 	// menus
+
+	pub wants_quit: bool,
 }
 
 impl View {
 	pub fn new() -> View {
-		View {}
+		View {
+			wants_quit: false,
+		}
 	}
 
 	pub fn build(&mut self, ui: &ui::Ui<'_>, app: &app::App) {
@@ -44,9 +48,13 @@ impl View {
 
 			ui.spring(ui::Axis::Horizontal);
 
-			ui.button()
+			let close_button = ui.button()
 				.with_constraints(|c| c.set_size((24.0, 24.0)))
 				.with_style(|s| s.set_fill(ui::WidgetColorRole::ErrorContainer));
+
+			if close_button.is_clicked() {
+				self.wants_quit = true;
+			}
 		})
 		.with_style(|style| {
 			style.rounding = Some(painter::BorderRadii {

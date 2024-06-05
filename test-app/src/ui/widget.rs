@@ -4,6 +4,10 @@ use super::*;
 use std::fmt::Debug;
 
 
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+pub struct WidgetId(pub(super) u64);
+
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum WidgetLifecycleEvent {
 	Created,

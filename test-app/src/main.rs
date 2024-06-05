@@ -175,6 +175,10 @@ async fn main() -> anyhow::Result<()> {
 			Event::AboutToWait => {
 				use winit::dpi::PhysicalSize;
 
+				if view.wants_quit {
+					target.exit();
+				}
+
 				if app.hack_changed.get() {
 					app.hack_changed.set(false);
 					window.request_redraw();
