@@ -25,7 +25,7 @@ pub struct ConfigureContext<'a> {
 
 	pub widget_id: WidgetId,
 	pub state: &'a mut StateBox,
-	pub text_state: &'a mut super::TextState,
+	pub text_atlas: &'a mut super::TextAtlas,
 }
 
 pub struct DrawContext<'a> {
@@ -37,7 +37,7 @@ pub struct DrawContext<'a> {
 
 	pub widget_id: WidgetId,
 	pub state: &'a mut StateBox,
-	pub text_state: &'a mut super::TextState,
+	pub text_atlas: &'a mut super::TextAtlas,
 	pub input: &'a Input,
 }
 
@@ -46,7 +46,7 @@ pub struct LifecycleContext<'a> {
 	
 	pub widget_id: WidgetId,
 	pub state: &'a mut StateBox,
-	pub text_state: &'a mut super::TextState,
+	pub text_atlas: &'a mut super::TextAtlas,
 	pub input: &'a Input,
 }
 

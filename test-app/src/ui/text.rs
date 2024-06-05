@@ -34,7 +34,7 @@ pub struct GlyphInfo {
 
 
 #[derive(Debug)]
-pub struct TextState {
+pub struct TextAtlas {
 	pub font_system: ct::FontSystem,
 	pub swash_cache: ct::SwashCache,
 
@@ -47,9 +47,9 @@ pub struct TextState {
 }
 
 
-impl TextState {
+impl TextAtlas {
 	pub fn new() -> Self {
-		TextState {
+		TextAtlas {
 			font_system: ct::FontSystem::new(),
 			swash_cache: ct::SwashCache::new(),
 

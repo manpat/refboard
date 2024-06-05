@@ -66,7 +66,7 @@ pub struct Ui<'ps> {
 	widget_constraints: &'ps RefCell<LayoutConstraintMap>,
 
 	persistent_state: &'ps PersistentState,
-	pub text_state: &'ps RefCell<TextState>,
+	pub text_atlas: &'ps RefCell<TextAtlas>,
 	pub input: &'ps Input,
 }
 
@@ -87,8 +87,8 @@ impl Ui<'_> {
 	{
 		let mut hierarchy = self.persistent_state.hierarchy.borrow_mut();
 		let mut widgets = self.persistent_state.widgets.borrow_mut();
-		let mut text_state = self.text_state.borrow_mut();
-		let text_state = &mut *text_state;
+		let mut text_atlas = self.text_atlas.borrow_mut();
+		let text_atlas = &mut *text_atlas;
 
 		let parent_id = parent_id.into();
 		let type_id = TypeId::of::<T>();
@@ -111,7 +111,7 @@ impl Ui<'_> {
 				widget_box.widget.lifecycle(LifecycleContext {
 					event: WidgetLifecycleEvent::Created,
 					state: &mut widget_box.state,
-					text_state,
+					text_atlas,
 					input: self.input,
 					widget_id,
 				});
@@ -136,7 +136,7 @@ impl Ui<'_> {
 				widget_box.widget.lifecycle(LifecycleContext {
 					event: WidgetLifecycleEvent::Updated,
 					state: &mut widget_box.state,
-					text_state,
+					text_atlas,
 					input: self.input,
 					widget_id,
 				});

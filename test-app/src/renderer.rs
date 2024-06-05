@@ -203,7 +203,7 @@ impl Renderer {
 		let text_atlas_texture = device.create_texture(&wgpu::TextureDescriptor {
 			label: Some("Text Atlas"),
 			size: wgpu::Extent3d {
-				// TODO(pat.m): should come from limits/TextState
+				// TODO(pat.m): should come from limits/TextAtlas
 				width: ui::TEXT_ATLAS_SIZE,
 				height: ui::TEXT_ATLAS_SIZE,
 				depth_or_array_layers: 1,
@@ -334,7 +334,7 @@ impl Renderer {
 		}
 	}
 
-	pub fn prepare(&mut self, painter: &Painter, viewport: &ui::Viewport, text_state: &mut ui::TextState) {
+	pub fn prepare(&mut self, painter: &Painter, viewport: &ui::Viewport, text_atlas: &mut ui::TextAtlas) {
 		let vertex_bytes = bytemuck::cast_slice(&painter.geometry.vertices);
 		let index_bytes = bytemuck::cast_slice(&painter.geometry.indices);
 
@@ -353,7 +353,7 @@ impl Renderer {
 			}
 		]));
 
-		for ui::GlyphUpdate{image, dst_pos} in text_state.glyph_updates.drain(..) {
+		for ui::GlyphUpdate{image, dst_pos} in text_atlas.glyph_updates.drain(..) {
 			let placement = image.placement;
 
 			let mut data = image.data;

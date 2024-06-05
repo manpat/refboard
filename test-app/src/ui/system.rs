@@ -4,8 +4,8 @@ use super::*;
 pub struct System {
 	pub viewport: Viewport,
 	pub input: Input,
-	pub text_state: RefCell<TextState>,
-	pub min_size: Vec2,
+	pub text_atlas: RefCell<TextAtlas>,
+	pub min_size: Vec2i,
 
 	persistent_state: PersistentState,
 	should_redraw: bool,
@@ -19,8 +19,8 @@ impl System {
 		System {
 			viewport: Viewport::default(),
 			input: Input::default(),
-			text_state: TextState::new().into(),
-			min_size: Vec2::zero(),
+			text_atlas: TextAtlas::new().into(),
+			min_size: Vec2i::zero(),
 
 			persistent_state: PersistentState::new(),
 			should_redraw: true,
@@ -60,7 +60,7 @@ impl System {
 
 			persistent_state: &self.persistent_state,
 			input: &self.input,
-			text_state: &self.text_state,
+			text_atlas: &self.text_atlas,
 		});
 
 		self.garbage_collect();
@@ -117,7 +117,7 @@ impl System {
 
 	fn garbage_collect(&mut self) {
 		let widgets = self.persistent_state.widgets.get_mut();
-		let text_state = self.text_state.get_mut();
+		let text_atlas = self.text_atlas.get_mut();
 
 		self.persistent_state.hierarchy.get_mut()
 			.collect_stale_nodes(|widget_id| {
@@ -125,7 +125,7 @@ impl System {
 					widget_state.widget.lifecycle(LifecycleContext {
 						event: WidgetLifecycleEvent::Destroyed,
 						state: &mut widget_state.state,
-						text_state,
+						text_atlas,
 						input: &self.input,
 						widget_id,
 					});
@@ -133,7 +133,7 @@ impl System {
 			});
 	}
 
-	fn calc_min_size(&self) -> Vec2 {
+	fn calc_min_size(&self) -> Vec2i {
 		let widget_constraints = self.widget_constraints.borrow();
 		let hierarchy = self.persistent_state.hierarchy.borrow();
 
@@ -146,7 +146,7 @@ impl System {
 			min_height = constraints.min_height.get().max(min_height);
 		}
 
-		Vec2::new(min_width, min_height)
+		Vec2i::new(min_width as i32, min_height as i32)
 	}
 
 
@@ -156,7 +156,7 @@ impl System {
 		let hierarchy = self.persistent_state.hierarchy.borrow();
 		let widgets = self.persistent_state.widgets.get_mut();
 		let widget_constraints = self.widget_constraints.get_mut();
-		let text_state = self.text_state.get_mut();
+		let text_atlas = self.text_atlas.get_mut();
 
 		let num_widgets = widgets.len();
 		widget_constraints.reserve(num_widgets);
@@ -177,7 +177,7 @@ impl System {
 				style: &mut widget_state.config.style,
 
 				state: &mut widget_state.state,
-				text_state,
+				text_atlas,
 				widget_id,
 			});
 
@@ -222,7 +222,7 @@ impl System {
 		let widgets = self.persistent_state.widgets.get_mut();
 		let hierarchy = self.persistent_state.hierarchy.borrow();
 
-		let text_state = self.text_state.get_mut();
+		let text_atlas = self.text_atlas.get_mut();
 		let app_style = &self.persistent_state.style;
 
 		// draw from root to leaves
@@ -246,7 +246,7 @@ impl System {
 			widget_state.widget.draw(DrawContext {
 				painter,
 				layout,
-				text_state,
+				text_atlas,
 
 				style,
 				app_style,

@@ -104,7 +104,7 @@ async fn main() -> anyhow::Result<()> {
 					view.build(ui, &app);
 				});
 
-				renderer.prepare(&painter, &ui_system.viewport, &mut *ui_system.text_state.borrow_mut());
+				renderer.prepare(&painter, &ui_system.viewport, &mut *ui_system.text_atlas.borrow_mut());
 
 				window.pre_present_notify();
 				renderer.present();
@@ -121,7 +121,7 @@ async fn main() -> anyhow::Result<()> {
 							view.build(ui, &app);
 						});
 						
-						renderer.prepare(&painter, &ui_system.viewport, &mut *ui_system.text_state.borrow_mut());
+						renderer.prepare(&painter, &ui_system.viewport, &mut *ui_system.text_atlas.borrow_mut());
 
 						window.pre_present_notify();
 						renderer.present();
@@ -132,8 +132,14 @@ async fn main() -> anyhow::Result<()> {
 					}
 
 					WindowEvent::Resized(new_physical_size) => {
+						use winit::dpi::PhysicalSize;
+
 						renderer.resize(new_physical_size.width, new_physical_size.height);
 						ui_system.set_size(Vec2i::new(new_physical_size.width as i32, new_physical_size.height as i32));
+
+						let Vec2i{x, y} = ui_system.min_size;
+						let new_min_size = PhysicalSize::new(x as u32, y as u32);
+						window.set_min_inner_size(Some(new_min_size));
 					}
 
 					// TODO(pat.m): theme change
@@ -188,8 +194,15 @@ async fn main() -> anyhow::Result<()> {
 					window.request_redraw();
 				}
 
-				let Vec2{x, y} = ui_system.min_size;
-				window.set_min_inner_size(Some(PhysicalSize::new(x as u32, y as u32)));
+				// If the minsize of the window has changed make sure we update it
+				let Vec2i{x, y} = ui_system.min_size;
+				let new_min_size = PhysicalSize::new(x as u32, y as u32);
+				let current_inner_size = window.inner_size();
+
+				if current_inner_size.width < new_min_size.width || current_inner_size.height < new_min_size.height {
+					window.set_min_inner_size(Some(new_min_size));
+					let _ = window.request_inner_size(new_min_size);
+				}
 			}
 
 			_ => {}

@@ -266,7 +266,7 @@ impl Widget for Text {
 			return
 		}
 
-		let font_system = &mut ctx.text_state.font_system;
+		let font_system = &mut ctx.text_atlas.font_system;
 
 		let metrics = cosmic_text::Metrics::new(HACK_FONT_SIZE, HACK_LINE_HEIGHT);
 
@@ -292,7 +292,7 @@ impl Widget for Text {
 		let state = self.get_state(ctx.state);
 
 		if !ctx.constraints.min_width.is_set() {
-			let buffer = state.buffer.borrow_with(&mut ctx.text_state.font_system);
+			let buffer = state.buffer.borrow_with(&mut ctx.text_atlas.font_system);
 
 			let min_width = buffer.layout_runs()
 				.map(|run| run.line_w)
@@ -305,7 +305,7 @@ impl Widget for Text {
 		}
 
 		if !ctx.constraints.min_height.is_set() {
-			let buffer = state.buffer.borrow_with(&mut ctx.text_state.font_system);
+			let buffer = state.buffer.borrow_with(&mut ctx.text_atlas.font_system);
 
 			let min_height = buffer.lines.len() as f32 * HACK_LINE_HEIGHT;
 			let padding = ctx.constraints.padding.vertical_sum();
@@ -320,7 +320,7 @@ impl Widget for Text {
 	fn draw(&self, ctx: DrawContext<'_>) {
 		let state = self.get_state(ctx.state);
 
-		let font_system = &mut ctx.text_state.font_system;
+		let font_system = &mut ctx.text_atlas.font_system;
 
 		// TODO(pat.m): do layout twice - once with unbounded/max size to find the desired size for constraining
 		// then again with calculated size for rendering.
@@ -336,7 +336,7 @@ impl Widget for Text {
 			for glyph in run.glyphs.iter() {
 				let physical_glyph = glyph.physical(start_pos.to_tuple(), 1.0);
 
-				let glyph_info = ctx.text_state.request_glyph(&physical_glyph.cache_key);
+				let glyph_info = ctx.text_atlas.request_glyph(&physical_glyph.cache_key);
 				// TODO(pat.m): pass glyph_info.subpixel_alpha down to painter
 
 				let pos = Vec2::new(physical_glyph.x as f32 + glyph_info.offset_x, physical_glyph.y as f32 + glyph_info.offset_y + run.line_y);

@@ -50,6 +50,8 @@ impl Input {
 
 			WindowEvent::CursorLeft { .. } => {
 				self.raw_cursor_pos = None;
+				self.cursor_pos_view = None;
+				self.hovered_widget = None;
 			}
 
 			WindowEvent::MouseInput { state: ElementState::Released, button, .. } => {
