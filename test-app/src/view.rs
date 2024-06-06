@@ -135,6 +135,11 @@ impl View {
 			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_outline(ui::WidgetColorRole::Outline);
 			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_outline(ui::WidgetColorRole::OutlineVariant);
 		});
+
+		ui.with_parent(ui.button("_____________"), || {
+			ui.text("I'm on top")
+				.with_input_behaviour(ui::InputBehaviour::TRANSPARENT);
+		})
 	}
 }
 

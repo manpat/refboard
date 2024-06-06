@@ -328,12 +328,13 @@ impl TextWidgetState {
 	fn measure(&mut self, atlas: &mut TextAtlas) -> Vec2 {
 		let buffer = self.buffer.borrow_with(&mut atlas.font_system);
 
+		// TODO(pat.m): can probably cache this stuff while content/available size doesn't change
 		let width = buffer.layout_runs()
 			.map(|run| run.line_w)
 			.max_by(|a, b| a.total_cmp(&b))
 			.unwrap_or(0.0);
 
-		let height = buffer.lines.len() as f32 * HACK_LINE_HEIGHT;
+		let height = buffer.lines.len() as f32 * buffer.metrics().line_height;
 
 		Vec2::new(width, height)
 	}

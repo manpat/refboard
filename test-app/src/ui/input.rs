@@ -194,6 +194,8 @@ bitflags! {
 		// TODO(pat.m): capture on mouse down? maybe this should be implicit
 		// TODO(pat.m): ignores clipping?
 
+		const TRANSPARENT = 1<<0;
+
 		const WINDOW_DRAG_ZONE = 1<<10;
 		const WINDOW_DRAG_RESIZE_ZONE = 1<<11;
 	}

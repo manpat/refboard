@@ -80,12 +80,14 @@ impl System {
 
 		// TODO(pat.m): move this into Input::process_events
 		if let Some(cursor_pos) = self.input.cursor_pos_view {
-			let input_handlers = &self.input.registered_widgets;
+			let registered_widgets = &self.input.registered_widgets;
 
 			// TODO(pat.m): instead of just storing the last hovered widget, store a 'stack' of hovered widgets
 			self.persistent_state.hierarchy.borrow()
 				.visit_breadth_first(None, |widget_id, _| {
-					if input_handlers[&widget_id].bounds.contains_point(cursor_pos) {
+					if let Some(widget_info) = registered_widgets.get(&widget_id)
+						&& widget_info.bounds.contains_point(cursor_pos)
+					{
 						self.input.hovered_widget = Some(widget_id);
 					}
 				});
@@ -104,9 +106,12 @@ impl System {
 
 		self.persistent_state.hierarchy.borrow()
 			.visit_breadth_first(None, |widget_id, _| {
-				// TODO(pat.m): clipping! also we probably want some per-widget configuration of input behaviour
-				let box_bounds = self.widget_layouts[&widget_id].box_bounds;
 				let widget_state = widgets.get_mut(&widget_id).unwrap();
+				if widget_state.config.input.contains(InputBehaviour::TRANSPARENT) {
+					return
+				}
+
+				let box_bounds = self.widget_layouts[&widget_id].box_bounds;
 
 				input_handlers.insert(widget_id, RegisteredWidget {
 					bounds: box_bounds,
