@@ -2,7 +2,6 @@ use crate::prelude::*;
 use super::*;
 
 use std::cell::RefMut;
-use std::marker::PhantomData;
 
 #[derive(Copy, Clone)]
 pub struct WidgetRef<'ui, T> {

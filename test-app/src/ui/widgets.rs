@@ -230,26 +230,14 @@ impl Widget for Button {
 
 		let state = self.get_state(ctx.state);
 
-		if !ctx.constraints.min_width.is_set() {
-			let buffer = state.buffer.borrow_with(&mut ctx.text_atlas.font_system);
+		if !ctx.constraints.min_width.is_set() || !ctx.constraints.min_height.is_set() {
+			let Vec2{x: width, y: height} = state.measure(ctx.text_atlas);
 
-			let min_width = buffer.layout_runs()
-				.map(|run| run.line_w)
-				.max_by(|a, b| a.total_cmp(&b))
-				.unwrap_or(0.0);
+			let horizontal_padding = ctx.constraints.padding.horizontal_sum();
+			let vertical_padding = ctx.constraints.padding.vertical_sum();
 
-			let padding = ctx.constraints.padding.horizontal_sum();
-
-			ctx.constraints.min_width.set_default(min_width + padding);
-		}
-
-		if !ctx.constraints.min_height.is_set() {
-			let buffer = state.buffer.borrow_with(&mut ctx.text_atlas.font_system);
-
-			let min_height = buffer.lines.len() as f32 * HACK_LINE_HEIGHT;
-			let padding = ctx.constraints.padding.vertical_sum();
-
-			ctx.constraints.min_height.set_default(min_height + padding);
+			ctx.constraints.min_width.set_default(width + horizontal_padding);
+			ctx.constraints.min_height.set_default(height + vertical_padding);
 		}
 
 		if ctx.style.fill.is_none() && ctx.style.outline.is_none() {
@@ -337,9 +325,18 @@ impl TextWidgetState {
 		buffer.set_text(text, attrs, cosmic_text::Shaping::Advanced);
 	}
 
-	// fn measure(&mut self) -> Vec2 {
-		
-	// }
+	fn measure(&mut self, atlas: &mut TextAtlas) -> Vec2 {
+		let buffer = self.buffer.borrow_with(&mut atlas.font_system);
+
+		let width = buffer.layout_runs()
+			.map(|run| run.line_w)
+			.max_by(|a, b| a.total_cmp(&b))
+			.unwrap_or(0.0);
+
+		let height = buffer.lines.len() as f32 * HACK_LINE_HEIGHT;
+
+		Vec2::new(width, height)
+	}
 }
 
 impl StatefulWidget for Text {
@@ -359,26 +356,14 @@ impl Widget for Text {
 	fn configure(&self, ctx: ConfigureContext<'_>) {
 		let state = self.get_state(ctx.state);
 
-		if !ctx.constraints.min_width.is_set() {
-			let buffer = state.buffer.borrow_with(&mut ctx.text_atlas.font_system);
+		if !ctx.constraints.min_width.is_set() || !ctx.constraints.min_height.is_set() {
+			let Vec2{x: width, y: height} = state.measure(ctx.text_atlas);
 
-			let min_width = buffer.layout_runs()
-				.map(|run| run.line_w)
-				.max_by(|a, b| a.total_cmp(&b))
-				.unwrap_or(0.0);
+			let horizontal_padding = ctx.constraints.padding.horizontal_sum();
+			let vertical_padding = ctx.constraints.padding.vertical_sum();
 
-			let padding = ctx.constraints.padding.horizontal_sum();
-
-			ctx.constraints.min_width.set_default(min_width + padding);
-		}
-
-		if !ctx.constraints.min_height.is_set() {
-			let buffer = state.buffer.borrow_with(&mut ctx.text_atlas.font_system);
-
-			let min_height = buffer.lines.len() as f32 * HACK_LINE_HEIGHT;
-			let padding = ctx.constraints.padding.vertical_sum();
-
-			ctx.constraints.min_height.set_default(min_height + padding);
+			ctx.constraints.min_width.set_default(width + horizontal_padding);
+			ctx.constraints.min_height.set_default(height + vertical_padding);
 		}
 
 		ctx.constraints.horizontal_size_policy.set_default(SizingBehaviour::FIXED);

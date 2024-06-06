@@ -1,4 +1,4 @@
-use std::any::{TypeId, Any};
+use std::any::Any;
 
 #[derive(Debug, Default)]
 pub struct StateBox(Option<Box<dyn Any>>);

@@ -26,7 +26,7 @@ pub use hierarchy::*;
 pub use viewport::*;
 pub use input::*;
 
-use std::any::{TypeId, Any};
+use std::any::TypeId;
 use std::marker::PhantomData;
 
 

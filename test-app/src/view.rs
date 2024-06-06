@@ -15,7 +15,7 @@ impl View {
 		}
 	}
 
-	pub fn build(&mut self, ui: &ui::Ui<'_>, app: &app::App) {
+	pub fn build(&mut self, ui: &ui::Ui<'_>, _app: &app::App) {
 		ui.with_vertical_frame(|| {
 			self.draw_menu_bar(ui);
 
