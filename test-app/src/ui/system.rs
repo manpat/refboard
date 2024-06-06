@@ -50,7 +50,7 @@ impl System {
 	pub fn run(&mut self, painter: &mut Painter, build_ui: impl FnOnce(&Ui<'_>)) {
 		self.persistent_state.hierarchy.get_mut().new_epoch();
 
-		self.interpret_input();
+		self.input.process_events(&self.viewport, self.persistent_state.hierarchy.get_mut());
 
 		self.widget_constraints.get_mut().clear();
 
@@ -71,30 +71,6 @@ impl System {
 		self.min_size = self.calc_min_size();
 
 		self.persist_input_bounds();
-	}
-
-	fn interpret_input(&mut self) {
-		self.input.process_events(&self.viewport);
-
-		// TODO(pat.m): collect input behaviour from existing widgets
-
-		// TODO(pat.m): move this into Input::process_events
-		if let Some(cursor_pos) = self.input.cursor_pos_view {
-			let registered_widgets = &self.input.registered_widgets;
-
-			// TODO(pat.m): instead of just storing the last hovered widget, store a 'stack' of hovered widgets
-			self.persistent_state.hierarchy.borrow()
-				.visit_breadth_first(None, |widget_id, _| {
-					if let Some(widget_info) = registered_widgets.get(&widget_id)
-						&& widget_info.bounds.contains_point(cursor_pos)
-					{
-						self.input.hovered_widget = Some(widget_id);
-					}
-				});
-
-			// TODO(pat.m): from the input behaviour of each widget in the hovered widget stack, calculate the target of 
-			// any mouse click/keyboard events.
-		}
 	}
 
 	fn persist_input_bounds(&mut self) {
