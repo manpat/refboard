@@ -48,38 +48,15 @@ async fn main() -> anyhow::Result<()> {
 	let event_loop = EventLoop::new()?;
 
 	let window_attributes = Window::default_attributes()
-		.with_title("refboard")
+		.with_title("ui fuckery")
 		.with_resizable(true)
-		.with_transparent(true) // Doesn't work on windows
+		.with_transparent(true)
 		.with_decorations(false)
-		.with_window_level(WindowLevel::AlwaysOnTop)
 		.with_visible(false);
-
-	// #[cfg(windows)] {
-	// 	use winit::platform::windows::WindowBuilderExtWindows;
-	// 	window_builder = window_builder.with_no_redirection_bitmap(true);
-	// }
 
 	// TODO(pat.m): rewrite all this shit again for winit 0.30
 	#[allow(deprecated)]
 	let window = Arc::new(event_loop.create_window(window_attributes)?);
-
-	// #[cfg(windows)]
-	// unsafe {
-	// 	use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-	// 	use windows::{Win32::{UI::WindowsAndMessaging::*, Foundation::*}};
-
-	// 	let RawWindowHandle::Win32(handle) = window.window_handle()?.as_raw() else { anyhow::bail!("Failed to get window handle"); };
-	// 	let hwnd = HWND(handle.hwnd.get());
-
-	// 	SetWindowLongPtrA(hwnd,
-	// 		GWL_EXSTYLE,
-	// 		GetWindowLongA(hwnd, GWL_EXSTYLE) as isize | WS_EX_LAYERED.0 as isize);
-
-	// 	SetLayeredWindowAttributes(hwnd, COLORREF(0), ((255 * 30) / 100) as u8, LWA_ALPHA)?;
-	// }
-
-	println!("window created");
 
 	let mut renderer = renderer::Renderer::start(window.clone()).await?;
 	let mut painter = painter::Painter::new();
@@ -164,8 +141,8 @@ async fn main() -> anyhow::Result<()> {
 								}
 							}
 
-							ui::SendEventResponse::DragResizeWindow => {
-								if let Err(err) = window.drag_resize_window(winit::window::ResizeDirection::SouthEast) {
+							ui::SendEventResponse::DragResizeWindow(resize_direction) => {
+								if let Err(err) = window.drag_resize_window(resize_direction) {
 									println!("Window drag resize failed {err}");
 								}
 							}

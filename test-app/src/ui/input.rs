@@ -3,6 +3,8 @@ use crate::prelude::*;
 use winit::event::{WindowEvent, ElementState, MouseButton as WinitMouseButton};
 use winit::dpi::PhysicalPosition;
 
+pub use winit::window::ResizeDirection;
+
 
 #[derive(Default, Debug)]
 pub struct Input {
@@ -66,20 +68,21 @@ impl Input {
 					return SendEventResponse::None
 				};
 
-				self.events.push(InputEvent::MouseDown(button));
-				self.mouse_states.insert(button, true);
-
 				// TODO(pat.m): shouldn't just use hovered_widget, but should
 				// pick first widget in hover stack that handles event
 				if let Some(widget_id) = self.hovered_widget
 				&& let Some(reg) = self.registered_widgets.get(&widget_id)
 				{
+					// If we hit a drag zone, then we _don't_ want to forward events to the rest of the ui
 					if reg.behaviour.contains(InputBehaviour::WINDOW_DRAG_ZONE) {
 						return SendEventResponse::DragWindow
 					} else if reg.behaviour.contains(InputBehaviour::WINDOW_DRAG_RESIZE_ZONE) {
-						return SendEventResponse::DragResizeWindow
+						return SendEventResponse::DragResizeWindow(ResizeDirection::SouthEast)
 					}
 				}
+
+				self.events.push(InputEvent::MouseDown(button));
+				self.mouse_states.insert(button, true);
 
 				// TODO(pat.m): immediately test interactive regions from prev frame
 				// if any are registered as claiming ownership or as being window hit regions
@@ -97,7 +100,7 @@ impl Input {
 pub enum SendEventResponse {
 	None,
 	DragWindow,
-	DragResizeWindow,
+	DragResizeWindow(ResizeDirection),
 }
 
 
