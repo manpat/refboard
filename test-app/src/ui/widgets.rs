@@ -15,8 +15,10 @@ impl Ui<'_> {
 		self.add_widget(Spring(axis))
 	}
 
-	pub fn button(&self) -> WidgetRef<'_, Button> {
-		self.add_widget(Button)
+	pub fn button(&self, text: impl Into<String>) -> WidgetRef<'_, Button> {
+		self.add_widget(Button {
+			text: text.into(),
+		})
 	}
 
 	pub fn text(&self, s: impl Into<String>) -> WidgetRef<'_, Text> {
@@ -197,17 +199,58 @@ impl Widget for Spring {
 
 
 #[derive(Debug)]
-pub struct Button;
+pub struct Button {
+	pub text: String
+}
+
+impl StatefulWidget for Button {
+	type State = TextWidgetState;
+}
 
 impl Widget for Button {
-	fn configure(&self, ctx: ConfigureContext<'_>) {
-		ctx.constraints.set_size_policy(SizingBehaviour::FIXED);
+	fn lifecycle(&mut self, ctx: LifecycleContext<'_>) {
+		if ctx.event == WidgetLifecycleEvent::Destroyed {
+			return
+		}
 
+		let state = self.get_state_or_else(ctx.state, || TextWidgetState::new(ctx.text_atlas));
+		state.update(ctx.text_atlas, &self.text);
+	}
+
+	fn configure(&self, ctx: ConfigureContext<'_>) {
+		ctx.constraints.horizontal_size_policy.set_default(SizingBehaviour::FIXED);
+		ctx.constraints.vertical_size_policy.set_default(SizingBehaviour::FIXED);
+
+		// TODO(pat.m): derive from style
 		ctx.constraints.padding.set_default(8.0);
 		ctx.constraints.margin.set_default(4.0);
 
-		ctx.constraints.min_width.set_default(72.0);
-		ctx.constraints.min_height.set_default(32.0);
+		// ctx.constraints.min_width.set_default(72.0);
+		// ctx.constraints.min_height.set_default(32.0);
+
+		let state = self.get_state(ctx.state);
+
+		if !ctx.constraints.min_width.is_set() {
+			let buffer = state.buffer.borrow_with(&mut ctx.text_atlas.font_system);
+
+			let min_width = buffer.layout_runs()
+				.map(|run| run.line_w)
+				.max_by(|a, b| a.total_cmp(&b))
+				.unwrap_or(0.0);
+
+			let padding = ctx.constraints.padding.horizontal_sum();
+
+			ctx.constraints.min_width.set_default(min_width + padding);
+		}
+
+		if !ctx.constraints.min_height.is_set() {
+			let buffer = state.buffer.borrow_with(&mut ctx.text_atlas.font_system);
+
+			let min_height = buffer.lines.len() as f32 * HACK_LINE_HEIGHT;
+			let padding = ctx.constraints.padding.vertical_sum();
+
+			ctx.constraints.min_height.set_default(min_height + padding);
+		}
 
 		if ctx.style.fill.is_none() && ctx.style.outline.is_none() {
 			ctx.style.set_fill(WidgetColorRole::SecondaryContainer);
@@ -235,6 +278,20 @@ impl Widget for Button {
 			ctx.painter.set_color(fill_color);
 			ctx.painter.rounded_rect(ctx.layout.box_bounds, rounding);
 		}
+
+		let state = self.get_state(ctx.state);
+
+		// TODO(pat.m): do layout twice - once with unbounded/max size to find the desired size for constraining
+		// then again with calculated size for rendering.
+		// Both of these can be cached.
+		let size = ctx.layout.content_bounds.size();
+		state.buffer.set_size(&mut ctx.text_atlas.font_system, size.x, size.y);
+
+		let start_pos = ctx.layout.content_bounds.min;
+		// TODO(pat.m): if content size > text buffer size then we should attempt to center
+
+		ctx.painter.set_color(base_color);
+		ctx.painter.draw_text_buffer(&state.buffer, ctx.text_atlas, start_pos);
 	}
 }
 
@@ -256,6 +313,35 @@ pub struct TextWidgetState {
 	buffer: cosmic_text::Buffer,
 }
 
+impl TextWidgetState {
+	fn new(atlas: &mut TextAtlas) -> Self {
+		// TODO(pat.m): derive from style
+		let metrics = cosmic_text::Metrics::new(HACK_FONT_SIZE, HACK_LINE_HEIGHT);
+
+		let font_system = &mut atlas.font_system;
+		let mut buffer = cosmic_text::Buffer::new(font_system, metrics);
+		buffer.set_size(font_system, 1000.0, 1000.0);
+		buffer.set_wrap(font_system, cosmic_text::Wrap::None);
+		TextWidgetState {buffer}
+	}
+
+	fn update(&mut self, atlas: &mut TextAtlas, text: &str) {
+		// TODO(pat.m): updating metrics from style
+		// if ctx.event == WidgetLifecycleEvent::Updated {
+		// 	buffer.set_metrics(metrics);
+		// }
+
+		let attrs = cosmic_text::Attrs::new();
+
+		let mut buffer = self.buffer.borrow_with(&mut atlas.font_system);
+		buffer.set_text(text, attrs, cosmic_text::Shaping::Advanced);
+	}
+
+	// fn measure(&mut self) -> Vec2 {
+		
+	// }
+}
+
 impl StatefulWidget for Text {
 	type State = TextWidgetState;
 }
@@ -266,26 +352,8 @@ impl Widget for Text {
 			return
 		}
 
-		let font_system = &mut ctx.text_atlas.font_system;
-
-		let metrics = cosmic_text::Metrics::new(HACK_FONT_SIZE, HACK_LINE_HEIGHT);
-
-		if ctx.event == WidgetLifecycleEvent::Created {
-			let mut buffer = cosmic_text::Buffer::new(font_system, metrics);
-			buffer.set_size(font_system, 1000.0, 1000.0);
-			buffer.set_wrap(font_system, cosmic_text::Wrap::None);
-			ctx.state.set(TextWidgetState {buffer});
-		}
-
-		let state = self.get_state(ctx.state);
-		let mut buffer = state.buffer.borrow_with(font_system);
-
-		// if ctx.event == WidgetLifecycleEvent::Updated {
-		// 	buffer.set_metrics(metrics);
-		// }
-
-		let attrs = cosmic_text::Attrs::new();
-		buffer.set_text(&self.text, attrs, cosmic_text::Shaping::Advanced);
+		let state = self.get_state_or_else(ctx.state, || TextWidgetState::new(ctx.text_atlas));
+		state.update(ctx.text_atlas, &self.text);
 	}
 
 	fn configure(&self, ctx: ConfigureContext<'_>) {
@@ -320,46 +388,17 @@ impl Widget for Text {
 	fn draw(&self, ctx: DrawContext<'_>) {
 		let state = self.get_state(ctx.state);
 
-		let font_system = &mut ctx.text_atlas.font_system;
-
 		// TODO(pat.m): do layout twice - once with unbounded/max size to find the desired size for constraining
 		// then again with calculated size for rendering.
 		// Both of these can be cached.
 		let size = ctx.layout.content_bounds.size();
 		let start_pos = ctx.layout.content_bounds.min;
-		state.buffer.set_size(font_system, size.x, size.y);
+		state.buffer.set_size(&mut ctx.text_atlas.font_system, size.x, size.y);
 
 		let text_color = ctx.style.text_color(ctx.app_style);
 
-		// TODO(pat.m): move into painter
-		for run in state.buffer.layout_runs() {
-			for glyph in run.glyphs.iter() {
-				let physical_glyph = glyph.physical(start_pos.to_tuple(), 1.0);
-
-				let glyph_info = ctx.text_atlas.request_glyph(&physical_glyph.cache_key);
-				// TODO(pat.m): pass glyph_info.subpixel_alpha down to painter
-
-				let pos = Vec2::new(physical_glyph.x as f32 + glyph_info.offset_x, physical_glyph.y as f32 + glyph_info.offset_y + run.line_y);
-				let uv_pos = Vec2::new(glyph_info.uv_x, glyph_info.uv_y);
-				let size = Vec2::new(glyph_info.width, glyph_info.height);
-				let bounds = Aabb2::new(pos, pos + size);
-
-				let atlas_size = Vec2::splat(2048.0);
-				let uv_bounds = Aabb2::new(uv_pos / atlas_size, (uv_pos + size) / atlas_size);
-
-				let glyph_color = match (glyph.color_opt, glyph_info.is_color_bitmap) {
-					(_, true) => Color::white(),
-					(Some(ct_color), _) => Color::from(ct_color.as_rgba()).to_linear(),
-					(None, _) => text_color,
-				};
-
-				ctx.painter.set_color(glyph_color);
-				ctx.painter.set_uv_rect(uv_bounds);
-				ctx.painter.rect(bounds);
-			}
-		}
-
-		ctx.painter.set_uv_rect(None);
+		ctx.painter.set_color(text_color);
+		ctx.painter.draw_text_buffer(&state.buffer, ctx.text_atlas, start_pos);
 	}
 }
 

@@ -87,4 +87,10 @@ pub trait StatefulWidget : Widget {
 	{
 		state_box.get_or_default()
 	}
+
+	fn get_state_or_else<'s, F>(&self, state_box: &'s mut StateBox, create: F) -> &'s mut Self::State
+		where F: FnOnce() -> Self::State
+	{
+		state_box.get_or_else(create)
+	}
 }

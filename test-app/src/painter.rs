@@ -226,6 +226,47 @@ impl Painter {
 }
 
 
+impl Painter {
+	pub fn draw_text_buffer(&mut self, buffer: &cosmic_text::Buffer, atlas: &mut ui::TextAtlas, start_pos: impl Into<Vec2>) {
+		let text_color = self.color;
+		let atlas_size = atlas.size().to_vec2();
+		let pixel_uv_size = Vec2::one() / atlas_size;
+
+		let start_pos = start_pos.into().to_tuple();
+
+		for run in buffer.layout_runs() {
+			for glyph in run.glyphs.iter() {
+				let physical_glyph = glyph.physical(start_pos, 1.0);
+
+				let glyph_info = atlas.request_glyph(&physical_glyph.cache_key);
+				// TODO(pat.m): pass glyph_info.subpixel_alpha down to painter
+
+				let pos = Vec2::new(physical_glyph.x as f32 + glyph_info.offset_x, physical_glyph.y as f32 + glyph_info.offset_y + run.line_y);
+				let uv_pos = Vec2::new(glyph_info.uv_x, glyph_info.uv_y);
+				let size = Vec2::new(glyph_info.width, glyph_info.height);
+				let bounds = Aabb2::new(pos, pos + size);
+
+				let uv_bounds = Aabb2::new(uv_pos * pixel_uv_size, (uv_pos + size) * pixel_uv_size);
+
+				let glyph_color = match (glyph.color_opt, glyph_info.is_color_bitmap) {
+					(_, true) => Color::white(),
+					(Some(ct_color), _) => Color::from(ct_color.as_rgba()).to_linear(),
+					(None, _) => text_color,
+				};
+
+				self.set_color(glyph_color);
+				self.set_uv_rect(uv_bounds);
+				self.rect(bounds);
+			}
+		}
+
+		// Restore initial state
+		self.set_color(text_color);
+		self.set_uv_rect(None);
+	}
+}
+
+
 
 pub trait IntoBorderRadii {
 	fn to_radii(&self) -> BorderRadii;

@@ -42,13 +42,13 @@ impl View {
 
 	fn draw_menu_bar(&mut self, ui: &ui::Ui<'_>) {
 		ui.with_horizontal_frame(|| {
-			ui.text("File").with_constraints(|c| c.margin.set_horizontal(4.0));
-			ui.text("Foo Bar").with_constraints(|c| c.margin.set_horizontal(4.0));
-			ui.text("Weh").with_constraints(|c| c.margin.set_horizontal(4.0));
+			ui.button("File").with_constraints(|c| {c.margin.set_horizontal(2.0); c.padding.set_vertical(4.0); });
+			ui.button("Foo Bar").with_constraints(|c| {c.margin.set_horizontal(2.0); c.padding.set_vertical(4.0); });
+			ui.button("Weh").with_constraints(|c| {c.margin.set_horizontal(2.0); c.padding.set_vertical(4.0); });
 
 			ui.spring(ui::Axis::Horizontal);
 
-			let close_button = ui.button()
+			let close_button = ui.button("x")
 				.with_constraints(|c| c.set_size((24.0, 24.0)))
 				.with_style(|s| s.set_fill(ui::WidgetColorRole::ErrorContainer));
 
@@ -102,17 +102,17 @@ impl View {
 
 	fn draw_content(&mut self, ui: &ui::Ui<'_>) {
 		ui.with_horizontal_layout(|| {
-			ui.button();
-			ui.button().style().set_fill(ui::WidgetColorRole::Primary);
-			ui.button().style().set_fill(ui::WidgetColorRole::Secondary);
-			ui.button().style().set_fill(ui::WidgetColorRole::Tertiary);
+			ui.button("Foo");
+			ui.button("Foo").style().set_fill(ui::WidgetColorRole::Primary);
+			ui.button("Foo").style().set_fill(ui::WidgetColorRole::Secondary);
+			ui.button("Foo").style().set_fill(ui::WidgetColorRole::Tertiary);
 
-			ui.button().style().set_fill(ui::WidgetColorRole::PrimaryContainer);
-			ui.button().style().set_fill(ui::WidgetColorRole::SecondaryContainer);
-			ui.button().style().set_fill(ui::WidgetColorRole::TertiaryContainer);
+			ui.button("Foo").style().set_fill(ui::WidgetColorRole::PrimaryContainer);
+			ui.button("Foo").style().set_fill(ui::WidgetColorRole::SecondaryContainer);
+			ui.button("Foo").style().set_fill(ui::WidgetColorRole::TertiaryContainer);
 
-			ui.button().style().set_outline(ui::WidgetColorRole::Outline);
-			ui.button().style().set_outline(ui::WidgetColorRole::OutlineVariant);
+			ui.button("Foo").style().set_outline(ui::WidgetColorRole::Outline);
+			ui.button("Foo").style().set_outline(ui::WidgetColorRole::OutlineVariant);
 		});
 
 		ui.with_horizontal_layout(|| {

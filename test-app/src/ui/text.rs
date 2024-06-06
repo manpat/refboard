@@ -101,4 +101,8 @@ impl TextAtlas {
 				info
 			})
 	}
+
+	pub fn size(&self) -> Vec2i {
+		Vec2i::splat(TEXT_ATLAS_SIZE as i32)
+	}
 }
