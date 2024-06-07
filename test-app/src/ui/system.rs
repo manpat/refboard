@@ -250,6 +250,11 @@ impl System {
 				return
 			}
 
+			// TODO(pat.m): yuck
+			let text_color = hierarchy.parent(widget_id)
+				.map(|parent_id| widgets[&parent_id].config.style.text_color_role())
+				.unwrap_or(WidgetColorRole::OnSurface);
+
 			let widget_state = widgets.get_mut(&widget_id).unwrap();
 			let style = &widget_state.config.style;
 
@@ -264,6 +269,7 @@ impl System {
 
 				style,
 				app_style,
+				text_color,
 
 				state: &mut widget_state.state,
 				input: &self.input,

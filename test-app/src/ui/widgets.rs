@@ -307,7 +307,11 @@ impl Widget for Text {
 		let start_pos = ctx.layout.content_bounds.min;
 		state.buffer.set_size(&mut ctx.text_atlas.font_system, size.x, size.y);
 
-		let text_color = ctx.style.text_color(ctx.app_style);
+		// TODO(pat.m): yuck
+		let text_color = match ctx.style.fill {
+			Some(_) => ctx.style.text_color(ctx.app_style),
+			None => ctx.app_style.resolve_color_role(ctx.text_color),
+		};
 
 		ctx.painter.set_color(text_color);
 		ctx.painter.draw_text_buffer(&state.buffer, ctx.text_atlas, start_pos);

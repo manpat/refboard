@@ -15,6 +15,15 @@ pub enum WidgetLifecycleEvent {
 	Destroyed,
 }
 
+pub struct LifecycleContext<'a> {
+	pub event: WidgetLifecycleEvent,
+	
+	pub widget_id: WidgetId,
+	pub state: &'a mut StateBox,
+	pub text_atlas: &'a mut super::TextAtlas,
+	pub input: &'a Input,
+}
+
 pub struct ConfigureContext<'a> {
 	pub constraints: &'a mut LayoutConstraints,
 	pub constraint_map: &'a LayoutConstraintMap,
@@ -32,18 +41,11 @@ pub struct DrawContext<'a> {
 	pub painter: &'a mut Painter,
 	pub layout: &'a Layout,
 
+	// TODO(pat.m): these should all be combined into a style context
 	pub style: &'a WidgetStyle,
 	pub app_style: &'a AppStyle,
+	pub text_color: WidgetColorRole,
 
-	pub widget_id: WidgetId,
-	pub state: &'a mut StateBox,
-	pub text_atlas: &'a mut super::TextAtlas,
-	pub input: &'a Input,
-}
-
-pub struct LifecycleContext<'a> {
-	pub event: WidgetLifecycleEvent,
-	
 	pub widget_id: WidgetId,
 	pub state: &'a mut StateBox,
 	pub text_atlas: &'a mut super::TextAtlas,
