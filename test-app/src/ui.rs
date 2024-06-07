@@ -42,25 +42,6 @@ struct WidgetBox {
 }
 
 
-pub struct PersistentState {
-	widgets: RefCell<HashMap<WidgetId, WidgetBox>>,
-	hierarchy: RefCell<Hierarchy>,
-
-	style: AppStyle,
-}
-
-impl PersistentState {
-	pub fn new() -> Self {
-		PersistentState {
-			widgets: Default::default(),
-			hierarchy: Default::default(),
-
-			style: AppStyle::new(),
-		}
-	}
-}
-
-
 pub struct Ui<'ps> {
 	stack: RefCell<Vec<WidgetId>>,
 	widget_constraints: &'ps RefCell<LayoutConstraintMap>,
@@ -108,6 +89,7 @@ impl Ui<'_> {
 					config: WidgetConfiguration::default(),
 				};
 
+				// TODO(pat.m): could this return something?
 				widget_box.widget.lifecycle(LifecycleContext {
 					event: WidgetLifecycleEvent::Created,
 					state: &mut widget_box.state,

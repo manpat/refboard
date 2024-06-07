@@ -163,12 +163,16 @@ pub struct AppStyle {
 
 impl AppStyle {
 	pub fn new() -> AppStyle {
-		let source = Argb::from_u32(0xFFDD6688);
-		// let source = Argb::from_u32(0xFF8899dd);
+		let source = Argb::from_u32(0xFF_820e35);
+		// let source = Argb::from_u32(0xFF_3f574f);
+		// let variant = dynamic_color::Variant::Fidelity;
+		let variant = dynamic_color::Variant::TonalSpot;
+		// let variant = dynamic_color::Variant::Content;
 		let dark_theme = true;
+		let contrast = None;
 
 		AppStyle {
-			scheme: DynamicScheme::by_variant(source, &dynamic_color::Variant::Content, dark_theme, None),
+			scheme: DynamicScheme::by_variant(source, &variant, dark_theme, contrast),
 			frame_rounding: 4.0,
 		}
 	}

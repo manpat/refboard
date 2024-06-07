@@ -15,6 +15,8 @@ pub struct Input {
 	pub events_received_this_frame: bool,
 
 	pub hovered_widget: Option<ui::WidgetId>,
+	pub active_widget: Option<ui::WidgetId>,
+	pub focus_widget: Option<ui::WidgetId>,
 
 	pub registered_widgets: HashMap<ui::WidgetId, RegisteredWidget>,
 
@@ -40,7 +42,10 @@ impl Input {
 		match event {
 			WindowEvent::CursorMoved { position, .. } => {
 				let PhysicalPosition {x, y} = position.cast();
-				self.raw_cursor_pos = Some(Vec2::new(x, y));
+				let raw_pos = Vec2::new(x, y);
+
+				self.raw_cursor_pos = Some(raw_pos);
+				self.events.push(InputEvent::MouseMove(raw_pos));
 
 				// TODO(pat.m): queue mouse move events so we don't lose precision
 				// maybe this can be opt in?
@@ -56,6 +61,8 @@ impl Input {
 				if let Some(button) = MouseButton::try_from_winit(button) {
 					self.events.push(InputEvent::MouseUp(button));
 					self.mouse_states.insert(button, false);
+
+					self.active_widget = None;
 				}
 			}
 
@@ -79,8 +86,6 @@ impl Input {
 
 				self.events.push(InputEvent::MouseDown(button));
 				self.mouse_states.insert(button, true);
-
-				// TODO(pat.m): capture input if necessary?
 			}
 
 			_ => {}
@@ -96,7 +101,7 @@ impl Input {
 
 		if let Some(cursor_pos) = self.cursor_pos_view {
 			// TODO(pat.m): instead of just storing the last hovered widget, store a 'stack' of hovered widgets
-			hierarchy.visit_breadth_first(None, |widget_id, _| {
+			hierarchy.visit_breadth_first(|widget_id, _| {
 				if let Some(widget_info) = self.registered_widgets.get(&widget_id)
 					&& widget_info.bounds.contains_point(cursor_pos)
 				{
@@ -105,10 +110,45 @@ impl Input {
 			});
 		}
 
+		// TODO(pat.m): this is completely bogus
+		if self.hovered_widget.is_some() {
+			if self.events.iter()
+				.any(|e| matches!(e, InputEvent::MouseUp(_)))
+			{
+				self.focus_widget = self.hovered_widget;
+			}
+
+			if self.is_any_mouse_down() && self.active_widget.is_none() {
+				self.active_widget = self.hovered_widget;
+			}
+		}
+
 		// TODO(pat.m): from the input behaviour of each widget in the hovered widget stack, calculate the target of 
 		// any mouse click/keyboard events.
 
 		// TODO(pat.m): if a mouse up event occurs, set focus to whatever the top most focusable widget is
+	}
+
+	#[instrument(skip_all)]
+	pub fn register_handlers(&mut self, hierarchy: &ui::Hierarchy,
+		widgets: &HashMap<ui::WidgetId, ui::WidgetBox>, layouts: &ui::LayoutMap)
+	{
+		self.registered_widgets.clear();
+
+		hierarchy.visit_breadth_first_with_cf(|widget_id, _| {
+			let widget_state = widgets.get(&widget_id).unwrap();
+			let behaviour = widget_state.config.input;
+
+			let blocks_input_to_children = behaviour.contains(InputBehaviour::OPAQUE);
+			let receives_input = !behaviour.contains(InputBehaviour::TRANSPARENT);
+
+			if receives_input {
+				let bounds = layouts[&widget_id].box_bounds;
+				self.registered_widgets.insert(widget_id, RegisteredWidget {bounds, behaviour});
+			}
+
+			!blocks_input_to_children
+		});
 	}
 }
 
@@ -129,6 +169,11 @@ impl Input {
 	pub fn is_mouse_down(&self, button: MouseButton) -> bool {
 		self.mouse_states.get(&button).copied()
 			.unwrap_or(false)
+	}
+
+	pub fn is_any_mouse_down(&self) -> bool {
+		self.mouse_states.iter()
+			.any(|(_, v)| *v)
 	}
 
 	/// Returns whether the last event for a mouse button was a down event
@@ -182,6 +227,8 @@ pub enum InputEvent {
 	MouseDown(MouseButton),
 	MouseUp(MouseButton),
 
+	MouseMove(Vec2),
+
 	// TODO(pat.m): character input events
 	// TODO(pat.m): key events
 }
@@ -210,7 +257,11 @@ bitflags! {
 		// TODO(pat.m): capture on mouse down? maybe this should be implicit
 		// TODO(pat.m): ignores clipping?
 
+		/// Do not accept any input events.
 		const TRANSPARENT = 1<<0;
+
+		/// Do not forward input events to children
+		const OPAQUE = 1<<1;
 
 		const WINDOW_DRAG_ZONE = 1<<10;
 		const WINDOW_DRAG_RESIZE_ZONE = 1<<11;

@@ -24,6 +24,8 @@ pub mod prelude {
 
 	pub use super::{painter, renderer, app, view, ui};
 	pub use super::util::*;
+
+	pub use ui::{StatefulWidget};
 	
 	pub use painter::Painter;
 	pub use app::{ItemKey, ImageKey};

@@ -8,6 +8,8 @@ pub struct View {
 
 	pub wants_quit: bool,
 	pub frame_counter: Wrapping<u16>,
+
+	pub slider_value: f32,
 }
 
 impl View {
@@ -15,6 +17,7 @@ impl View {
 		View {
 			wants_quit: false,
 			frame_counter: Wrapping(0),
+			slider_value: 0.5,
 		}
 	}
 
@@ -54,7 +57,6 @@ impl View {
 			ui.spring(ui::Axis::Horizontal);
 
 			let close_button = ui.button("x")
-				// .with_constraints(|c| c.set_size((24.0, 24.0)))
 				.with_style(|s| s.set_fill(ui::WidgetColorRole::ErrorContainer));
 
 			if close_button.is_clicked() {
@@ -159,9 +161,139 @@ impl View {
 
 			ui.dummy();
 		});
+
+		ui.with_horizontal_layout(|| {
+			let slider_widget = ui.add_widget(Slider{ value: self.slider_value });
+			self.slider_value = slider_widget.widget().value;
+
+			ui.text(format!("{:.2}", self.slider_value))
+				.with_style(|s| s.set_fill(ui::WidgetColorRole::PrimaryContainer))
+				.with_constraints(|c| {
+					c.margin.set(4.0);
+					c.padding.set(4.0);
+				});
+		})
+		.with_constraints(|c| {
+			c.horizontal_size_policy.set(ui::SizingBehaviour::CAN_GROW);
+			c.content_alignment.set(ui::Align::Middle);
+		});
 	}
 }
 
 
 
 
+#[derive(Debug)]
+struct Slider { value: f32, }
+
+#[derive(Default, Debug)]
+struct SliderState {
+	drag_state: Option<(Vec2, f32)>,
+	handle_travel_length: f32,
+}
+
+impl ui::Widget for Slider {
+	fn lifecycle(&mut self, ctx: ui::LifecycleContext<'_>) {
+		let state = self.get_state_or_default(ctx.state);
+
+		let is_active = ctx.input.active_widget == Some(ctx.widget_id);
+
+		if is_active {
+			if let Some((start_pos, start_value)) = state.drag_state {
+				let delta = ctx.input.cursor_pos_view.unwrap_or(start_pos) - start_pos;
+
+				self.value = (start_value + delta.x / state.handle_travel_length).clamp(0.0, 1.0);
+
+			} else {
+				state.drag_state = Some((ctx.input.cursor_pos_view.unwrap(), self.value));
+			}
+		} else {
+			state.drag_state = None;
+		}
+	}
+
+	fn configure(&self, ctx: ui::ConfigureContext<'_>) {
+		ctx.constraints.min_width.set_default(20.0);
+		ctx.constraints.preferred_height.set_default(20.0);
+
+		ctx.constraints.padding.set_horizontal(5.0);
+		ctx.constraints.padding.set_vertical(2.5);
+
+		ctx.constraints.horizontal_size_policy.set_default(ui::SizingBehaviour::CAN_GROW);
+		ctx.constraints.vertical_size_policy.set_default(ui::SizingBehaviour::FIXED);
+	}
+
+	fn draw(&self, ctx: ui::DrawContext<'_>) {
+		let state = self.get_state(ctx.state);
+
+		let bounds = ctx.layout.content_bounds;
+		let half_height = bounds.height() / 2.0;
+
+		let handle_stroke_width = 5.0;
+		let track_width = 10.0;
+		let dot_radius = track_width / 4.0;
+
+		let handle_travel_start = bounds.min.x + handle_stroke_width;
+		let handle_travel_length = bounds.width() - handle_stroke_width * 2.0;
+
+		state.handle_travel_length = handle_travel_length;
+
+		let handle_pos_x = handle_travel_start + handle_travel_length * self.value;
+
+		let left_center = bounds.min + Vec2::from_y(half_height);
+		let right_center = bounds.max - Vec2::from_y(half_height);
+		let center = Vec2::new(handle_pos_x, left_center.y);
+
+		let primary_color = ctx.app_style.resolve_color_role(ui::WidgetColorRole::Primary);
+		let primary_container_color = ctx.app_style.resolve_color_role(ui::WidgetColorRole::SecondaryContainer);
+
+		let active_track_color = primary_color;
+		let mut inactive_track_color = primary_container_color;
+
+		// Apply state layer
+		let is_hovered = ctx.input.hovered_widget == Some(ctx.widget_id);
+		let is_active = ctx.input.active_widget == Some(ctx.widget_id);
+
+		if is_active {
+			inactive_track_color = 0.1f32.lerp(inactive_track_color, primary_color);
+		} else if is_hovered {
+			inactive_track_color = 0.08f32.lerp(inactive_track_color, primary_color);
+		}
+
+		let handle_color = active_track_color;
+
+		ctx.painter.set_line_width(track_width);
+		ctx.painter.stroke_options.start_cap = lyon::tessellation::LineCap::Round;
+		ctx.painter.stroke_options.end_cap = lyon::tessellation::LineCap::Butt;
+
+		// Active Track
+		ctx.painter.set_color(active_track_color);
+		ctx.painter.line(left_center, center - Vec2::from_x(handle_stroke_width));
+
+		// Inactive Track
+		ctx.painter.set_color(inactive_track_color);
+		ctx.painter.line(right_center, center + Vec2::from_x(handle_stroke_width));
+
+		// Active Track Stop
+		ctx.painter.set_color(inactive_track_color);
+		ctx.painter.circle(left_center, dot_radius);
+
+		// Inactive Track Stop
+		ctx.painter.set_color(active_track_color);
+		ctx.painter.circle(right_center, dot_radius);
+
+		// Handle
+		ctx.painter.set_line_width(handle_stroke_width);
+		ctx.painter.stroke_options.start_cap = lyon::tessellation::LineCap::Round;
+		ctx.painter.stroke_options.end_cap = lyon::tessellation::LineCap::Round;
+
+		let cross_size = Vec2::from_y(half_height);
+
+		ctx.painter.set_color(handle_color);
+		ctx.painter.line(center - cross_size, center + cross_size);
+	}
+}
+
+impl ui::StatefulWidget for Slider {
+	type State = SliderState;
+}

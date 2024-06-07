@@ -158,6 +158,8 @@ impl Widget for Spring {
 		ctx.constraints.size_policy_mut(self.0).set_default(SizingBehaviour::FLEXIBLE);
 		ctx.constraints.size_policy_mut(self.0.opposite()).set_default(SizingBehaviour::FIXED);
 		ctx.constraints.self_alignment.set_default(Align::Middle);
+
+		*ctx.input |= InputBehaviour::TRANSPARENT;
 	}
 }
 
@@ -180,6 +182,9 @@ impl Widget for Button {
 		if ctx.style.fill.is_none() && ctx.style.outline.is_none() {
 			ctx.style.set_fill(WidgetColorRole::SecondaryContainer);
 		}
+
+		// TODO(pat.m): set_default for input behaviour
+		*ctx.input |= ui::InputBehaviour::OPAQUE;
 	}
 
 	fn draw(&self, ctx: DrawContext<'_>) {

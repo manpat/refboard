@@ -76,30 +76,11 @@ impl System {
 
 		self.min_size = self.calc_min_size();
 
-		self.persist_input_bounds();
-	}
-
-	#[instrument(skip_all)]
-	fn persist_input_bounds(&mut self) {
-		let input_handlers = &mut self.input.registered_widgets;
-		let widgets = self.persistent_state.widgets.get_mut();
-
-		input_handlers.clear();
-
-		self.persistent_state.hierarchy.borrow()
-			.visit_breadth_first(None, |widget_id, _| {
-				let widget_state = widgets.get_mut(&widget_id).unwrap();
-				if widget_state.config.input.contains(InputBehaviour::TRANSPARENT) {
-					return
-				}
-
-				let box_bounds = self.widget_layouts[&widget_id].box_bounds;
-
-				input_handlers.insert(widget_id, RegisteredWidget {
-					bounds: box_bounds,
-					behaviour: widget_state.config.input,
-				});
-			});
+		self.input.register_handlers(
+			self.persistent_state.hierarchy.get_mut(),
+			self.persistent_state.widgets.get_mut(),
+			&self.widget_layouts
+		);
 	}
 
 	#[instrument(skip_all)]
@@ -148,7 +129,7 @@ impl System {
 		widget_constraints.reserve(num_widgets);
 
 		// bottom up request size hints/policies and content sizes if appropriate
-		hierarchy.visit_leaves_first(None, |widget_id| {
+		hierarchy.visit_leaves_first(|widget_id| {
 			let mut constraints = widget_constraints.get(&widget_id).cloned().unwrap_or_default();
 			let children = hierarchy.children(widget_id);
 			let widget_state = widgets.get_mut(&widget_id).unwrap();
@@ -205,7 +186,7 @@ impl System {
 		}
 
 		// top down resolve layouts and assign rects
-		hierarchy.visit_breadth_first(None, |widget_id, children| {
+		hierarchy.visit_breadth_first(|widget_id, children| {
 			// this widget should already be laid out or root
 			let content_bounds = self.widget_layouts[&widget_id].content_bounds;
 			let constraints = &widget_constraints[&widget_id];
@@ -240,7 +221,7 @@ impl System {
 		let app_style = &self.persistent_state.style;
 
 		// draw from root to leaves
-		hierarchy.visit_breadth_first(None, |widget_id, _| {
+		hierarchy.visit_breadth_first(|widget_id, _| {
 			let layout = &self.widget_layouts[&widget_id];
 
 			// Don't draw if not visible
@@ -277,20 +258,58 @@ impl System {
 			});
 		});
 
-		// Visualise clip rects
+		// Debug visualisation
 		// TODO(pat.m): make this a debug setting
+		painter.set_clip_rect(None);
+
 		if false {
-			painter.set_clip_rect(None);
-			painter.set_color(Color::white());
+			if let Some(hovered_widget) = self.input.hovered_widget {
+				painter.set_color(Color::light_cyan());
+				self.debug_widget(painter, hovered_widget);
+			}
 
-			hierarchy.visit_breadth_first(None, |widget_id, _| {
-				let layout = &self.widget_layouts[&widget_id];
+			if let Some(focus_widget) = self.input.focus_widget {
+				painter.set_color(Color::light_red());
+				self.debug_widget(painter, focus_widget);
+			}
 
-				painter.rect_outline(layout.box_bounds);
-				// if let Some(clip) = self.widget_layouts[&widget_id].clip_rect {
-				// 	painter.rect_outline(clip);
-				// }
+			if let Some(active_widget) = self.input.active_widget {
+				painter.set_color(Color::light_green());
+				self.debug_widget(painter, active_widget);
+			}
+
+			hierarchy.visit_breadth_first(|widget_id, _| {
+				self.debug_widget(painter, widget_id);
 			});
+		}
+	}
+
+	fn debug_widget(&self, painter: &mut Painter, widget_id: WidgetId) {
+		let layout = &self.widget_layouts[&widget_id];
+
+		painter.rect_outline(layout.box_bounds);
+
+		// if let Some(clip) = self.widget_layouts[&widget_id].clip_rect {
+		// 	painter.rect_outline(clip);
+		// }
+	}
+}
+
+
+pub struct PersistentState {
+	pub(super) widgets: RefCell<HashMap<WidgetId, WidgetBox>>,
+	pub(super) hierarchy: RefCell<Hierarchy>,
+
+	pub(super) style: AppStyle,
+}
+
+impl PersistentState {
+	pub fn new() -> Self {
+		PersistentState {
+			widgets: Default::default(),
+			hierarchy: Default::default(),
+
+			style: AppStyle::new(),
 		}
 	}
 }

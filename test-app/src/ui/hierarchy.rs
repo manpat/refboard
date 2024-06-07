@@ -146,26 +146,27 @@ impl Hierarchy {
 		}
 	}
 
-	pub fn visit_breadth_first<F>(&self, start: impl Into<Option<WidgetId>>, mut visit: F)
-		where F: FnMut(WidgetId, &[WidgetId])
+	pub fn visit_breadth_first_with_cf<F>(&self, mut visit: F)
+		where F: FnMut(WidgetId, &[WidgetId]) -> bool
 	{
-		let start = start.into();
-		let children = match start {
-			Some(widget_id) => self.nodes[&widget_id].children.as_slice(),
-			None => self.root_node.children.as_slice(),
-		};
-
 		// TODO(pat.m): reuse intermediate visit structures
 		let mut visit_queue = VecDeque::new();
 
-		visit_queue.extend(children.into_iter());
+		visit_queue.extend(self.root_node.children.iter().cloned());
 
 		while let Some(parent) = visit_queue.pop_front() {
 			let children = self.nodes[&parent].children.as_slice();
-			visit_queue.extend(children.iter().copied());
-
-			visit(parent, children);
+			let should_visit_children = visit(parent, children);
+			if should_visit_children {
+				visit_queue.extend(children.iter().copied());
+			}
 		}
+	}
+
+	pub fn visit_breadth_first<F>(&self, mut visit: F)
+		where F: FnMut(WidgetId, &[WidgetId])
+	{
+		self.visit_breadth_first_with_cf(move |p, cs| { visit(p, cs); true });
 	}
 
 	pub fn visit_breadth_first_with_parent_context<F, C>(&self, init: C, mut visit: F)
@@ -191,22 +192,12 @@ impl Hierarchy {
 	}
 
 	/// Postorder traversal
-	pub fn visit_leaves_first<F>(&self, start: impl Into<Option<WidgetId>>, mut visit: F)
+	pub fn visit_leaves_first<F>(&self, mut visit: F)
 		where F: FnMut(WidgetId)
 	{
 		// TODO(pat.m): reuse intermediate visit structures
 		let mut visit_stack = Vec::new();
-
-		let start = start.into();
-		match start {
-			Some(widget_id) => {
-				visit_stack.push((widget_id, false));
-			}
-
-			None => {
-				visit_stack.extend(self.root_node.children.iter().rev().map(|&id| (id, false)));
-			}
-		};
+		visit_stack.extend(self.root_node.children.iter().rev().map(|&id| (id, false)));
 
 		while let Some((parent, children_visited)) = visit_stack.pop() {
 			if children_visited {
@@ -234,3 +225,4 @@ impl HierarchyNode {
 		self.current_epoch_child_counter = 0;
 	}
 }
+

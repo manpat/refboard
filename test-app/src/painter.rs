@@ -13,8 +13,9 @@ pub struct Painter {
 
 	fill_tess: FillTessellator,
 	stroke_tess: StrokeTessellator,
-	fill_options: FillOptions,
-	stroke_options: StrokeOptions,
+
+	pub fill_options: FillOptions,
+	pub stroke_options: StrokeOptions,
 
 	scratch_path: PathBuffer,
 
