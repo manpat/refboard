@@ -363,7 +363,6 @@ impl Renderer {
 
 			if image.content == cosmic_text::SwashContent::Mask {
 				data = data.into_iter()
-					// TODO(pat.m): premultiply?
 					.flat_map(|alpha| [255, 255, 255, alpha])
 					.collect();
 			}
@@ -433,7 +432,7 @@ impl Renderer {
 						resolve_target: Some(&current_frame_view),
 						ops: wgpu::Operations {
 							load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-							store: wgpu::StoreOp::Store,
+							store: wgpu::StoreOp::Discard,
 						},
 					}
 				}

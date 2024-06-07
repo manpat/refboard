@@ -20,6 +20,7 @@ impl Ui<'_> {
 
 		let text = text.into();
 		if !text.is_empty() {
+			// TODO(pat.m): how to get fill style of parent into child?
 			self.add_widget_to(Text{text}, &widget);
 		}
 
