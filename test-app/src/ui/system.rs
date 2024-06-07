@@ -79,8 +79,8 @@ impl System {
 		self.persist_input_bounds();
 	}
 
+	#[instrument(skip_all)]
 	fn persist_input_bounds(&mut self) {
-		// Persist widget bounds
 		let input_handlers = &mut self.input.registered_widgets;
 		let widgets = self.persistent_state.widgets.get_mut();
 
@@ -102,6 +102,7 @@ impl System {
 			});
 	}
 
+	#[instrument(skip_all)]
 	fn garbage_collect(&mut self) {
 		let widgets = self.persistent_state.widgets.get_mut();
 		let text_atlas = self.text_atlas.get_mut();
@@ -150,7 +151,6 @@ impl System {
 		hierarchy.visit_leaves_first(None, |widget_id| {
 			let mut constraints = widget_constraints.get(&widget_id).cloned().unwrap_or_default();
 			let children = hierarchy.children(widget_id);
-
 			let widget_state = widgets.get_mut(&widget_id).unwrap();
 
 			widget_state.widget.configure(ConfigureContext {
@@ -165,6 +165,23 @@ impl System {
 				text_atlas,
 				widget_id,
 			});
+
+			// If this widget has children, set default min and preferred lengths from the accumulated lengths of the children.
+			if !children.is_empty() {
+				let main_axis = constraints.layout_axis.get();
+				let cross_axis = main_axis.opposite();
+
+				let measurement = measure_children_linear(main_axis, children, widget_constraints);
+				
+				let padding_main = constraints.padding.axis_sum(main_axis);
+				let padding_cross = constraints.padding.axis_sum(cross_axis);
+
+				constraints.min_length_mut(main_axis).set_default(measurement.min_main + padding_main);
+				constraints.min_length_mut(cross_axis).set_default(measurement.min_cross + padding_cross);
+
+				constraints.preferred_length_mut(main_axis).set_default(measurement.preferred_main + padding_main);
+				constraints.preferred_length_mut(cross_axis).set_default(measurement.preferred_cross + padding_cross);
+			}
 
 			widget_constraints.insert(widget_id, constraints);
 		});
@@ -261,9 +278,12 @@ impl System {
 			painter.set_color(Color::white());
 
 			hierarchy.visit_breadth_first(None, |widget_id, _| {
-				if let Some(clip) = self.widget_layouts[&widget_id].clip_rect {
-					painter.rect_outline(clip);
-				}
+				let layout = &self.widget_layouts[&widget_id];
+
+				painter.rect_outline(layout.box_bounds);
+				// if let Some(clip) = self.widget_layouts[&widget_id].clip_rect {
+				// 	painter.rect_outline(clip);
+				// }
 			});
 		}
 	}

@@ -16,9 +16,14 @@ impl Ui<'_> {
 	}
 
 	pub fn button(&self, text: impl Into<String>) -> WidgetRef<'_, Button> {
-		self.add_widget(Button {
-			text: text.into(),
-		})
+		let widget = self.add_widget(Button{});
+
+		let text = text.into();
+		if !text.is_empty() {
+			self.add_widget_to(Text{text}, &widget);
+		}
+
+		widget
 	}
 
 	pub fn text(&self, s: impl Into<String>) -> WidgetRef<'_, Text> {
@@ -90,54 +95,13 @@ impl BoxLayout {
 
 impl Widget for BoxLayout {
 	fn configure(&self, ctx: ConfigureContext<'_>) {
-		let ConfigureContext { constraints, children, constraint_map, .. } = ctx;
+		let ConfigureContext { constraints, .. } = ctx;
 
 		constraints.layout_axis.set_default(self.axis);
-
-		let main_axis = constraints.layout_axis.get();
-		let cross_axis = main_axis.opposite();
-
-		let mut total_main_min_length = 0.0f32;
-		let mut total_cross_min_length = 0.0f32;
-
-		let mut total_main_preferred_length = 0.0f32;
-		let mut total_cross_preferred_length = 0.0f32;
-
-		for &child in children {
-			let child_constraints = &constraint_map[&child];
-
-			let margin_main = child_constraints.margin.axis_sum(main_axis);
-			let margin_cross = child_constraints.margin.axis_sum(cross_axis);
-
-			let min_length = child_constraints.min_length(main_axis);
-			let preferred_length = child_constraints.preferred_length(main_axis);
-
-			total_main_min_length += min_length + margin_main;
-			total_main_preferred_length += preferred_length + margin_main;
-
-			total_cross_min_length = total_cross_min_length.max(child_constraints.min_length(cross_axis) + margin_cross);
-			total_cross_preferred_length = total_cross_preferred_length.max(child_constraints.preferred_length(cross_axis) + margin_cross);
-		}
-
 		constraints.padding.set_default(8.0);
 
-		let padding_main = constraints.padding.axis_sum(main_axis);
-		let padding_cross = constraints.padding.axis_sum(cross_axis);
-
-		total_main_min_length += padding_main;
-		total_cross_min_length += padding_cross;
-
-		total_main_preferred_length += padding_main;
-		total_cross_preferred_length += padding_cross;
-
-		constraints.min_length_mut(main_axis).set_default(total_main_min_length);
-		constraints.min_length_mut(cross_axis).set_default(total_cross_min_length);
-
-		constraints.preferred_length_mut(main_axis).set_default(total_main_preferred_length);
-		constraints.preferred_length_mut(cross_axis).set_default(total_cross_preferred_length);
-
-		constraints.size_policy_mut(main_axis).set_default(SizingBehaviour::FIXED);
-		constraints.size_policy_mut(cross_axis).set_default(SizingBehaviour::FIXED);
+		constraints.horizontal_size_policy.set_default(SizingBehaviour::FIXED);
+		constraints.vertical_size_policy.set_default(SizingBehaviour::FIXED);
 	}
 }
 
@@ -199,46 +163,18 @@ impl Widget for Spring {
 
 
 #[derive(Debug)]
-pub struct Button {
-	pub text: String
-}
-
-impl StatefulWidget for Button {
-	type State = TextWidgetState;
-}
+pub struct Button {}
 
 impl Widget for Button {
-	fn lifecycle(&mut self, ctx: LifecycleContext<'_>) {
-		if ctx.event == WidgetLifecycleEvent::Destroyed {
-			return
-		}
-
-		let state = self.get_state_or_else(ctx.state, || TextWidgetState::new(ctx.text_atlas));
-		state.update(ctx.text_atlas, &self.text);
-	}
-
 	fn configure(&self, ctx: ConfigureContext<'_>) {
 		ctx.constraints.horizontal_size_policy.set_default(SizingBehaviour::FIXED);
 		ctx.constraints.vertical_size_policy.set_default(SizingBehaviour::FIXED);
 
+		ctx.constraints.content_alignment.set_default(ui::Align::Middle);
+
 		// TODO(pat.m): derive from style
 		ctx.constraints.padding.set_default(8.0);
 		ctx.constraints.margin.set_default(4.0);
-
-		// ctx.constraints.min_width.set_default(72.0);
-		// ctx.constraints.min_height.set_default(32.0);
-
-		let state = self.get_state(ctx.state);
-
-		if !ctx.constraints.min_width.is_set() || !ctx.constraints.min_height.is_set() {
-			let Vec2{x: width, y: height} = state.measure(ctx.text_atlas);
-
-			let horizontal_padding = ctx.constraints.padding.horizontal_sum();
-			let vertical_padding = ctx.constraints.padding.vertical_sum();
-
-			ctx.constraints.min_width.set_default(width + horizontal_padding);
-			ctx.constraints.min_height.set_default(height + vertical_padding);
-		}
 
 		if ctx.style.fill.is_none() && ctx.style.outline.is_none() {
 			ctx.style.set_fill(WidgetColorRole::SecondaryContainer);
@@ -266,20 +202,6 @@ impl Widget for Button {
 			ctx.painter.set_color(fill_color);
 			ctx.painter.rounded_rect(ctx.layout.box_bounds, rounding);
 		}
-
-		let state = self.get_state(ctx.state);
-
-		// TODO(pat.m): do layout twice - once with unbounded/max size to find the desired size for constraining
-		// then again with calculated size for rendering.
-		// Both of these can be cached.
-		let size = ctx.layout.content_bounds.size();
-		state.buffer.set_size(&mut ctx.text_atlas.font_system, size.x, size.y);
-
-		let start_pos = ctx.layout.content_bounds.min;
-		// TODO(pat.m): if content size > text buffer size then we should attempt to center
-
-		ctx.painter.set_color(base_color);
-		ctx.painter.draw_text_buffer(&state.buffer, ctx.text_atlas, start_pos);
 	}
 }
 
@@ -369,6 +291,9 @@ impl Widget for Text {
 
 		ctx.constraints.horizontal_size_policy.set_default(SizingBehaviour::FIXED);
 		ctx.constraints.vertical_size_policy.set_default(SizingBehaviour::FIXED);
+
+		// TODO(pat.m): set_default for input behaviour
+		*ctx.input |= ui::InputBehaviour::TRANSPARENT;
 	}
 
 	fn draw(&self, ctx: DrawContext<'_>) {

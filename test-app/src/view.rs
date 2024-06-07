@@ -54,7 +54,7 @@ impl View {
 			ui.spring(ui::Axis::Horizontal);
 
 			let close_button = ui.button("x")
-				.with_constraints(|c| c.set_size((24.0, 24.0)))
+				// .with_constraints(|c| c.set_size((24.0, 24.0)))
 				.with_style(|s| s.set_fill(ui::WidgetColorRole::ErrorContainer));
 
 			if close_button.is_clicked() {
@@ -86,7 +86,7 @@ impl View {
 
 			ui.spring(ui::Axis::Horizontal);
 
-			ui.text("Resize")
+			ui.button("Resize")
 				.with_input_behaviour(ui::InputBehaviour::WINDOW_DRAG_RESIZE_ZONE)
 				.with_style(|s| s.set_outline(ui::WidgetColorRole::Outline))
 				.with_constraints(|c| {
@@ -145,16 +145,19 @@ impl View {
 			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_outline(ui::WidgetColorRole::OutlineVariant);
 		});
 
-		ui.with_parent_widget(ui::Button{ text: "__________".into() }, || {
+		ui.with_parent_widget(ui::Button{}, || {
 			ui.dummy();
 
-			ui.text("I'm on top")
-				.with_input_behaviour(ui::InputBehaviour::TRANSPARENT);
+			ui.text("I'm a layout");
+
+			ui.text("3")
+				.with_style(|s| s.set_fill(ui::WidgetColorRole::Primary))
+				.with_constraints(|c| {
+					c.margin.set(4.0);
+					c.padding.set(2.0);
+				});
 
 			ui.dummy();
-		})
-		.with_constraints(|c| {
-			c.content_alignment.set(ui::Align::Middle);
 		});
 	}
 }

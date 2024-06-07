@@ -29,6 +29,8 @@ pub enum Align {
 	Start,
 	Middle,
 	End,
+
+	// TODO(pat.m): baseline
 }
 
 
@@ -354,6 +356,51 @@ impl LayoutConstraints {
 
 
 
+pub struct ChildMeasurement {
+	pub min_main: f32,
+	pub min_cross: f32,
+
+	pub preferred_main: f32,
+	pub preferred_cross: f32,
+}
+
+pub fn measure_children_linear(
+	main_axis: Axis,
+	children: &[WidgetId],
+	constraints: &LayoutConstraintMap)
+	-> ChildMeasurement
+{
+	let cross_axis = main_axis.opposite();
+
+	let mut total_main_min_length = 0.0f32;
+	let mut total_cross_min_length = 0.0f32;
+
+	let mut total_main_preferred_length = 0.0f32;
+	let mut total_cross_preferred_length = 0.0f32;
+
+	for &child in children {
+		let child_constraints = &constraints[&child];
+
+		let margin_main = child_constraints.margin.axis_sum(main_axis);
+		let margin_cross = child_constraints.margin.axis_sum(cross_axis);
+
+		let min_length = child_constraints.min_length(main_axis);
+		let preferred_length = child_constraints.preferred_length(main_axis);
+
+		total_main_min_length += min_length + margin_main;
+		total_main_preferred_length += preferred_length + margin_main;
+
+		total_cross_min_length = total_cross_min_length.max(child_constraints.min_length(cross_axis) + margin_cross);
+		total_cross_preferred_length = total_cross_preferred_length.max(child_constraints.preferred_length(cross_axis) + margin_cross);
+	}
+
+	ChildMeasurement {
+		min_main: total_main_min_length,
+		min_cross: total_cross_min_length,
+		preferred_main: total_main_preferred_length,
+		preferred_cross: total_cross_preferred_length,
+	}
+}
 
 
 pub fn layout_children_linear(
