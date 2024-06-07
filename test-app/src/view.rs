@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use std::num::Wrapping;
 
 pub struct View {
 	// item view
@@ -6,12 +7,14 @@ pub struct View {
 	// menus
 
 	pub wants_quit: bool,
+	pub frame_counter: Wrapping<u16>,
 }
 
 impl View {
 	pub fn new() -> View {
 		View {
 			wants_quit: false,
+			frame_counter: Wrapping(0),
 		}
 	}
 
@@ -38,6 +41,8 @@ impl View {
 			c.padding.set(0.0);
 			c.margin.set(0.0);
 		});
+
+		self.frame_counter += 1;
 	}
 
 	fn draw_menu_bar(&mut self, ui: &ui::Ui<'_>) {
@@ -76,6 +81,9 @@ impl View {
 
 	fn draw_status_bar(&mut self, ui: &ui::Ui<'_>) {
 		ui.with_horizontal_frame(|| {
+			ui.text(format!("Frame #{}", self.frame_counter))
+				.with_constraints(|c| c.margin.set(8.0));
+
 			ui.spring(ui::Axis::Horizontal);
 
 			ui.text("Resize")
@@ -97,6 +105,7 @@ impl View {
 		.with_constraints(|c| {
 			c.horizontal_size_policy.set(ui::SizingBehaviour::CAN_GROW);
 			c.padding.set(0.0);
+			c.content_alignment.set(ui::Align::Middle);
 		});
 	}
 

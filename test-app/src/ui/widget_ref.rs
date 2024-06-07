@@ -48,12 +48,6 @@ impl<'ui, T> WidgetRef<'ui, T> {
 		self.widget_box().1
 	}
 
-	pub fn state_as<S>(&self) -> RefMut<'ui, S>
-		where S: Default + 'static
-	{
-		RefMut::map(self.any_state(), |s| s.get_or_default())
-	}
-
 	pub fn constraints(&self) -> RefMut<'ui, LayoutConstraints> {
 		RefMut::map(
 			self.ui.widget_constraints.borrow_mut(),
@@ -102,7 +96,7 @@ impl<'ui, T> WidgetRef<'ui, T>
 	pub fn state_or_default(&self) -> RefMut<'ui, T::State>
 		where T::State: Default
 	{
-		self.state_as()
+		RefMut::map(self.any_state(), |s| s.get_or_default())
 	}
 }
 
