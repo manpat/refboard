@@ -33,27 +33,7 @@ impl Input {
 		self.events_received_this_frame = false;
 	}
 
-	pub fn process_events(&mut self, viewport: &ui::Viewport, hierarchy: &ui::Hierarchy) {
-		self.cursor_pos_view = self.raw_cursor_pos
-			.map(|raw_pos| viewport.physical_to_view() * raw_pos);
-
-		if let Some(cursor_pos) = self.cursor_pos_view {
-			// TODO(pat.m): instead of just storing the last hovered widget, store a 'stack' of hovered widgets
-			hierarchy.visit_breadth_first(None, |widget_id, _| {
-				if let Some(widget_info) = self.registered_widgets.get(&widget_id)
-					&& widget_info.bounds.contains_point(cursor_pos)
-				{
-					self.hovered_widget = Some(widget_id);
-				}
-			});
-		}
-
-		// TODO(pat.m): from the input behaviour of each widget in the hovered widget stack, calculate the target of 
-		// any mouse click/keyboard events.
-
-		// TODO(pat.m): if a mouse up event occurs, set focus to whatever the top most focusable widget is
-	}
-
+	#[instrument(skip_all)]
 	pub fn send_event(&mut self, event: WindowEvent) -> SendEventResponse {
 		self.events_received_this_frame = true;
 
@@ -107,6 +87,28 @@ impl Input {
 		}
 
 		SendEventResponse::None
+	}
+
+	#[instrument(skip_all)]
+	pub fn process_events(&mut self, viewport: &ui::Viewport, hierarchy: &ui::Hierarchy) {
+		self.cursor_pos_view = self.raw_cursor_pos
+			.map(|raw_pos| viewport.physical_to_view() * raw_pos);
+
+		if let Some(cursor_pos) = self.cursor_pos_view {
+			// TODO(pat.m): instead of just storing the last hovered widget, store a 'stack' of hovered widgets
+			hierarchy.visit_breadth_first(None, |widget_id, _| {
+				if let Some(widget_info) = self.registered_widgets.get(&widget_id)
+					&& widget_info.bounds.contains_point(cursor_pos)
+				{
+					self.hovered_widget = Some(widget_id);
+				}
+			});
+		}
+
+		// TODO(pat.m): from the input behaviour of each widget in the hovered widget stack, calculate the target of 
+		// any mouse click/keyboard events.
+
+		// TODO(pat.m): if a mouse up event occurs, set focus to whatever the top most focusable widget is
 	}
 }
 

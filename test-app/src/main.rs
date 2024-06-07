@@ -35,6 +35,10 @@ pub mod prelude {
 
 	pub use std::collections::{VecDeque, HashMap, HashSet};
 	pub use std::cell::{Cell, RefCell};
+	
+	pub use tracing;
+	#[doc(hidden)]
+	pub use tracing::instrument;
 }
 
 
@@ -44,6 +48,9 @@ async fn main() -> anyhow::Result<()> {
 	std::env::set_var("RUST_BACKTRACE", "1");
 
 	env_logger::init();
+
+	#[cfg(feature="tracy")]
+	init_tracy();
 
 	let event_loop = EventLoop::new()?;
 
@@ -188,3 +195,17 @@ async fn main() -> anyhow::Result<()> {
 	.map_err(Into::into)
 }
 
+
+
+#[cfg(feature="tracy")]
+fn init_tracy() {
+    use tracing_subscriber::layer::SubscriberExt;
+
+    let subscriber = tracing_subscriber::registry()
+        .with(tracing_tracy::TracyLayer::new());
+
+    tracing::subscriber::set_global_default(subscriber)
+    	.expect("set up the subscriber");
+    	
+	println!("tracy init");
+}

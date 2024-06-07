@@ -145,10 +145,17 @@ impl View {
 			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_outline(ui::WidgetColorRole::OutlineVariant);
 		});
 
-		ui.with_parent(ui.button("_____________"), || {
+		ui.with_parent_widget(ui::Button{ text: "__________".into() }, || {
+			ui.dummy();
+
 			ui.text("I'm on top")
 				.with_input_behaviour(ui::InputBehaviour::TRANSPARENT);
+
+			ui.dummy();
 		})
+		.with_constraints(|c| {
+			c.content_alignment.set(ui::Align::Middle);
+		});
 	}
 }
 

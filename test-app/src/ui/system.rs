@@ -47,12 +47,15 @@ impl System {
 	}
 
 	// TODO(pat.m): could this be built around the same mechanism as std::thread::scope?
+	#[instrument(name = "ui::System::run", skip_all)]
 	pub fn run(&mut self, painter: &mut Painter, build_ui: impl FnOnce(&Ui<'_>)) {
 		self.persistent_state.hierarchy.get_mut().new_epoch();
 
 		self.input.process_events(&self.viewport, self.persistent_state.hierarchy.get_mut());
 
 		self.widget_constraints.get_mut().clear();
+
+		let span = tracing::trace_span!("build_ui").entered();
 
 		build_ui(&Ui {
 			stack: Default::default(),
@@ -63,8 +66,11 @@ impl System {
 			text_atlas: &self.text_atlas,
 		});
 
+		span.exit();
+
 		self.garbage_collect();
 
+		self.configure_widgets();
 		self.layout_widgets();
 		self.draw_widgets(painter);
 
@@ -130,10 +136,8 @@ impl System {
 		Vec2i::new(min_width as i32, min_height as i32)
 	}
 
-
-	fn layout_widgets(&mut self) {
-		let available_bounds = self.viewport.view_bounds();
-
+	#[instrument(skip_all)]
+	fn configure_widgets(&mut self) {
 		let hierarchy = self.persistent_state.hierarchy.borrow();
 		let widgets = self.persistent_state.widgets.get_mut();
 		let widget_constraints = self.widget_constraints.get_mut();
@@ -164,6 +168,17 @@ impl System {
 
 			widget_constraints.insert(widget_id, constraints);
 		});
+	}
+
+	#[instrument(skip_all)]
+	fn layout_widgets(&mut self) {
+		let available_bounds = self.viewport.view_bounds();
+
+		let hierarchy = self.persistent_state.hierarchy.borrow();
+		let widgets = self.persistent_state.widgets.get_mut();
+		let widget_constraints = self.widget_constraints.get_mut();
+
+		let num_widgets = widgets.len();
 
 		self.widget_layouts.clear();
 		self.widget_layouts.reserve(num_widgets);
@@ -199,6 +214,7 @@ impl System {
 	}
 
 
+	#[instrument(skip_all)]
 	fn draw_widgets(&mut self, painter: &mut Painter) {
 		let widgets = self.persistent_state.widgets.get_mut();
 		let hierarchy = self.persistent_state.hierarchy.borrow();

@@ -27,6 +27,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
+	#[instrument(skip_all)]
 	pub async fn start(window: Arc<winit::window::Window>) -> anyhow::Result<Renderer> {
 		let size = window.inner_size();
 
@@ -324,6 +325,7 @@ impl Renderer {
 			.create_view(&wgpu::TextureViewDescriptor::default())
 	}
 
+	#[instrument(name = "Renderer::resize", skip_all)]
 	pub fn resize(&mut self, new_width: u32, new_height: u32) {
 		self.surface_config.width = new_width.max(1);
 		self.surface_config.height = new_height.max(1);
@@ -334,6 +336,7 @@ impl Renderer {
 		}
 	}
 
+	#[instrument(name = "Renderer::prepare", skip_all)]
 	pub fn prepare(&mut self, painter: &Painter, viewport: &ui::Viewport, text_atlas: &mut ui::TextAtlas) {
 		let vertex_bytes = bytemuck::cast_slice(&painter.geometry.vertices);
 		let index_bytes = bytemuck::cast_slice(&painter.geometry.indices);
@@ -393,6 +396,7 @@ impl Renderer {
 		}
 	}
 
+	#[instrument(name = "Renderer::present", skip_all)]
 	pub fn present(&mut self) {
 		if self.surface_config.width <= 0 || self.surface_config.height <= 0 {
 			return;
