@@ -10,6 +10,7 @@ pub struct View {
 	pub frame_counter: Wrapping<u16>,
 
 	pub slider_value: f32,
+	pub button_clicks: u32,
 }
 
 impl View {
@@ -18,6 +19,7 @@ impl View {
 			wants_quit: false,
 			frame_counter: Wrapping(0),
 			slider_value: 0.5,
+			button_clicks: 0,
 		}
 	}
 
@@ -147,19 +149,21 @@ impl View {
 			ui.text("Foo").with_constraints(|c| c.padding.set(4.0)).style().set_outline(ui::WidgetColorRole::OutlineVariant);
 		});
 
-		ui.with_parent_widget(ui::Button{}, || {
-			ui.dummy();
+		let button = ui.button("");
 
-			ui.text("I'm a layout");
+		if button.is_clicked() {
+			self.button_clicks += 1;
+		}
 
-			ui.text("3")
+		ui.with_parent(button, || {
+			ui.text("I'm a button");
+
+			ui.text(self.button_clicks.to_string())
 				.with_style(|s| s.set_fill(ui::WidgetColorRole::Primary))
 				.with_constraints(|c| {
 					c.margin.set(4.0);
 					c.padding.set(2.0);
 				});
-
-			ui.dummy();
 		});
 
 		ui.with_horizontal_layout(|| {
@@ -216,8 +220,8 @@ impl ui::Widget for Slider {
 		ctx.constraints.min_width.set_default(20.0);
 		ctx.constraints.preferred_height.set_default(20.0);
 
-		ctx.constraints.padding.set_horizontal(5.0);
-		ctx.constraints.padding.set_vertical(2.5);
+		ctx.constraints.padding.set_horizontal(6.0);
+		ctx.constraints.padding.set_vertical(3.0);
 
 		ctx.constraints.horizontal_size_policy.set_default(ui::SizingBehaviour::CAN_GROW);
 		ctx.constraints.vertical_size_policy.set_default(ui::SizingBehaviour::FIXED);
@@ -230,7 +234,7 @@ impl ui::Widget for Slider {
 		let half_height = bounds.height() / 2.0;
 
 		let handle_stroke_width = 5.0;
-		let track_width = 10.0;
+		let track_width = 12.0;
 		let dot_radius = track_width / 4.0;
 
 		let handle_travel_start = bounds.min.x + handle_stroke_width;
@@ -242,7 +246,10 @@ impl ui::Widget for Slider {
 
 		let left_center = bounds.min + Vec2::from_y(half_height);
 		let right_center = bounds.max - Vec2::from_y(half_height);
-		let center = Vec2::new(handle_pos_x, left_center.y);
+		let handle_center = Vec2::new(handle_pos_x, left_center.y);
+
+		let left_stop = Vec2::new(handle_travel_start, left_center.y);
+		let right_stop = Vec2::new(handle_travel_start + handle_travel_length, left_center.y);
 
 		let primary_color = ctx.app_style.resolve_color_role(ui::WidgetColorRole::Primary);
 		let primary_container_color = ctx.app_style.resolve_color_role(ui::WidgetColorRole::SecondaryContainer);
@@ -255,7 +262,7 @@ impl ui::Widget for Slider {
 		let is_active = ctx.input.active_widget == Some(ctx.widget_id);
 
 		if is_active {
-			inactive_track_color = 0.1f32.lerp(inactive_track_color, primary_color);
+			inactive_track_color = 0.16f32.lerp(inactive_track_color, primary_color);
 		} else if is_hovered {
 			inactive_track_color = 0.08f32.lerp(inactive_track_color, primary_color);
 		}
@@ -268,19 +275,19 @@ impl ui::Widget for Slider {
 
 		// Active Track
 		ctx.painter.set_color(active_track_color);
-		ctx.painter.line(left_center, center - Vec2::from_x(handle_stroke_width));
+		ctx.painter.line(left_center, handle_center - Vec2::from_x(handle_stroke_width));
 
 		// Inactive Track
 		ctx.painter.set_color(inactive_track_color);
-		ctx.painter.line(right_center, center + Vec2::from_x(handle_stroke_width));
+		ctx.painter.line(right_center, handle_center + Vec2::from_x(handle_stroke_width));
 
 		// Active Track Stop
 		ctx.painter.set_color(inactive_track_color);
-		ctx.painter.circle(left_center, dot_radius);
+		ctx.painter.circle(left_stop, dot_radius);
 
 		// Inactive Track Stop
 		ctx.painter.set_color(active_track_color);
-		ctx.painter.circle(right_center, dot_radius);
+		ctx.painter.circle(right_stop, dot_radius);
 
 		// Handle
 		ctx.painter.set_line_width(handle_stroke_width);
@@ -290,7 +297,7 @@ impl ui::Widget for Slider {
 		let cross_size = Vec2::from_y(half_height);
 
 		ctx.painter.set_color(handle_color);
-		ctx.painter.line(center - cross_size, center + cross_size);
+		ctx.painter.line(handle_center - cross_size, handle_center + cross_size);
 	}
 }
 
