@@ -4,8 +4,8 @@ use material_colors::{
 	color::Argb,
 };
 
-// https://docs.rs/material-colors/latest/material_colors/
 // https://m3.material.io/styles/color/roles
+// https://docs.rs/material-colors/latest/material_colors/
 // https://codelabs.developers.google.com/color-contrast-accessibility?hl=en#0
 
 #[derive(Debug, Default, Clone)]

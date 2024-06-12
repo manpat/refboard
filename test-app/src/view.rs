@@ -11,6 +11,7 @@ pub struct View {
 
 	pub slider_value: f32,
 	pub button_clicks: u32,
+	pub checkbox_value: bool,
 }
 
 impl View {
@@ -20,6 +21,7 @@ impl View {
 			frame_counter: Wrapping(0),
 			slider_value: 0.5,
 			button_clicks: 0,
+			checkbox_value: false,
 		}
 	}
 
@@ -178,6 +180,17 @@ impl View {
 		})
 		.with_constraints(|c| {
 			c.horizontal_size_policy.set(ui::SizingBehaviour::CAN_GROW);
+			c.content_alignment.set(ui::Align::Middle);
+		});
+
+		ui.with_horizontal_layout(|| {
+			ui.text("Checkbox");
+			ui.checkbox(&mut self.checkbox_value);
+			ui.checkbox(&mut self.checkbox_value);
+			ui.checkbox(&mut self.checkbox_value);
+			ui.checkbox(&mut self.checkbox_value);
+		})
+		.with_constraints(|c| {
 			c.content_alignment.set(ui::Align::Middle);
 		});
 	}

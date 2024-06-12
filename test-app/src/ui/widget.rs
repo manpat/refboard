@@ -21,7 +21,16 @@ pub struct LifecycleContext<'a> {
 	pub state: &'a mut StateBox,
 	pub text_atlas: &'a mut super::TextAtlas,
 	pub input: &'a Input,
+
+	pub should_redraw: &'a Cell<bool>,
 }
+
+impl LifecycleContext<'_> {
+	pub fn trigger_redraw(&self) {
+		self.should_redraw.set(true);
+	}
+}
+
 
 pub struct ConfigureContext<'a> {
 	pub constraints: &'a mut LayoutConstraints,

@@ -45,6 +45,7 @@ struct WidgetBox {
 pub struct Ui<'ps> {
 	stack: RefCell<Vec<WidgetId>>,
 	widget_constraints: &'ps RefCell<LayoutConstraintMap>,
+	should_redraw: &'ps Cell<bool>,
 
 	persistent_state: &'ps PersistentState,
 	pub text_atlas: &'ps RefCell<TextAtlas>,
@@ -96,6 +97,7 @@ impl Ui<'_> {
 					text_atlas,
 					input: self.input,
 					widget_id,
+					should_redraw: self.should_redraw,
 				});
 
 				widgets.insert(widget_id, widget_box);
@@ -121,6 +123,7 @@ impl Ui<'_> {
 					text_atlas,
 					input: self.input,
 					widget_id,
+					should_redraw: self.should_redraw,
 				});
 			}
 		}

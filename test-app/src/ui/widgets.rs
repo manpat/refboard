@@ -4,11 +4,13 @@ use crate::ui::*;
 use std::fmt::{self, Debug};
 
 pub mod button;
+pub mod checkbox;
 pub mod slider;
 pub mod spring;
 pub mod text;
 
 pub use button::*;
+pub use checkbox::*;
 pub use slider::*;
 pub use spring::*;
 pub use text::*;

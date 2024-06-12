@@ -1,8 +1,9 @@
 use crate::prelude::*;
 
 use lyon::math::{Point, Box2D};
-use lyon::path::{Path, PathBuffer, Winding as PathWinding};
+use lyon::path::{PathBuffer, Winding as PathWinding};
 use lyon::path::builder::PathBuilder;
+use lyon::path::path_buffer::Builder as PathBufferBuilder;
 use lyon::tessellation::*;
 
 pub use lyon::path::builder::BorderRadii;
@@ -65,19 +66,7 @@ impl Painter {
 
 		f(&mut self.stroke_tess, &self.stroke_options, &mut BuffersBuilder::new(&mut self.geometry, vertex_constructor));
 
-		if let Some(dst_rect) = self.uv_rect {
-			let src_pos = bounds.min;
-			let src_size = bounds.size();
-
-			let dst_pos = dst_rect.min;
-			let dst_size = dst_rect.size();
-
-			for vertex in &mut self.geometry.vertices[num_initial_verts..] {
-				let normalised = (Vec2::from(vertex.pos) - src_pos) / src_size;
-				let uv = normalised * dst_size + dst_pos;
-				vertex.uv = uv.into();
-			}
-		}
+		self.fixup_uvs(num_initial_verts, bounds);
 	}
 
 	fn with_filler(&mut self, f: impl FnOnce(&mut FillTessellator, &FillOptions, &mut BuffersBuilder<'_, renderer::Vertex, u32, VertexConstructor>))
@@ -92,7 +81,10 @@ impl Painter {
 
 		f(&mut self.fill_tess, &self.fill_options, &mut BuffersBuilder::new(&mut self.geometry, vertex_constructor));
 
-		// Fix up uvs if necessary
+		self.fixup_uvs(num_initial_verts, bounds);
+	}
+
+	fn fixup_uvs(&mut self, num_initial_verts: usize, bounds: Aabb2) {
 		if let Some(dst_rect) = self.uv_rect {
 			let src_pos = bounds.min;
 			let src_size = bounds.size();
@@ -100,11 +92,9 @@ impl Painter {
 			let dst_pos = dst_rect.min;
 			let dst_size = dst_rect.size();
 
-			let scale = dst_size / src_size;
-			let offset = dst_pos - src_pos * scale;
-
 			for vertex in &mut self.geometry.vertices[num_initial_verts..] {
-				let uv = Vec2::from(vertex.pos) * scale + offset;
+				let normalised = (Vec2::from(vertex.pos) - src_pos) / src_size;
+				let uv = normalised * dst_size + dst_pos;
 				vertex.uv = uv.into();
 			}
 		}
@@ -160,15 +150,9 @@ impl Painter {
 
 		let rect = to_box_centroid(rect.into());
 
-		let mut scratch_path = std::mem::take(&mut self.scratch_path);
-		scratch_path.clear();
-
-		let mut builder = scratch_path.builder();
-		builder.add_rounded_rectangle(&rect, &radii, PathWinding::Positive, &[]);
-		builder.build();
-
-		self.with_stroker(|tess, opts, builder| tess.tessellate(scratch_path.get(0).iter(), opts, builder).unwrap());
-		self.scratch_path = scratch_path;
+		self.stroke_path(|builder| {
+			builder.add_rounded_rectangle(&rect, &radii, PathWinding::Positive, &[]);
+		});
 	}
 
 	pub fn rounded_rect(&mut self, rect: impl Into<Aabb2>, radii: impl IntoBorderRadii) {
@@ -181,23 +165,46 @@ impl Painter {
 
 		let rect = to_box(rect.into());
 
-		let mut scratch_path = std::mem::take(&mut self.scratch_path);
-		scratch_path.clear();
+		self.fill_path(|builder| {
+			builder.add_rounded_rectangle(&rect, &radii, PathWinding::Positive, &[]);
+		});
+	}
 
+	// TODO(pat.m): have this callback take a custom type so we can adapt types
+	pub fn stroke_path(&mut self, make_path: impl FnOnce(&mut PathBufferBuilder)) {
+		let mut scratch_path = std::mem::take(&mut self.scratch_path);
+
+		scratch_path.clear();
 		let mut builder = scratch_path.builder();
-		builder.add_rounded_rectangle(&rect, &radii, PathWinding::Positive, &[]);
+		make_path(&mut builder);
+
 		builder.build();
 
-		self.with_filler(|tess, opts, builder| tess.tessellate(scratch_path.get(0).iter(), opts, builder).unwrap());
+		self.with_stroker(|tess, opts, builder| {
+			for path in scratch_path.iter() {
+				tess.tessellate_path(path, opts, builder).unwrap()
+			}
+		});
+
 		self.scratch_path = scratch_path;
 	}
 
-	pub fn stroke_path(&mut self, path: &Path) {
-		self.with_stroker(|tess, opts, builder| tess.tessellate_path(path, opts, builder).unwrap());
-	}
+	pub fn fill_path(&mut self, make_path: impl FnOnce(&mut PathBufferBuilder)) {
+		let mut scratch_path = std::mem::take(&mut self.scratch_path);
 
-	pub fn fill_path(&mut self, path: &Path) {
-		self.with_filler(|tess, opts, builder| tess.tessellate_path(path, opts, builder).unwrap());
+		scratch_path.clear();
+		let mut builder = scratch_path.builder();
+		make_path(&mut builder);
+
+		builder.build();
+
+		self.with_filler(|tess, opts, builder| {
+			for path in scratch_path.iter() {
+				tess.tessellate_path(path, opts, builder).unwrap()
+			}
+		});
+
+		self.scratch_path = scratch_path;
 	}
 
 	pub fn line(&mut self, start: impl Into<Vec2>, end: impl Into<Vec2>) {

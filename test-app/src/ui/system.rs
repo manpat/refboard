@@ -7,7 +7,7 @@ pub struct System {
 	pub min_size: Vec2i,
 
 	persistent_state: PersistentState,
-	should_redraw: bool,
+	should_redraw: Cell<bool>,
 
 	widget_constraints: RefCell<LayoutConstraintMap>,
 	widget_layouts: LayoutMap,
@@ -22,7 +22,7 @@ impl System {
 			min_size: Vec2i::zero(),
 
 			persistent_state: PersistentState::new(),
-			should_redraw: true,
+			should_redraw: Cell::new(true),
 
 			widget_constraints: Default::default(),
 			widget_layouts: LayoutMap::new(),
@@ -31,23 +31,24 @@ impl System {
 
 	pub fn set_size(&mut self, new_size: Vec2i) {
 		if self.viewport.size.to_vec2i() != new_size {
-			self.should_redraw = true;
+			self.should_redraw.set(true);
 			self.viewport.size = new_size.to_vec2();
 		}
 	}
 
 	pub fn prepare_next_frame(&mut self) {
-		self.should_redraw = false;
 		self.input.reset();
 	}
 
 	pub fn should_redraw(&self) -> bool {
-		self.should_redraw || self.input.events_received_this_frame
+		self.should_redraw.get() || self.input.events_received_this_frame
 	}
 
 	// TODO(pat.m): could this be built around the same mechanism as std::thread::scope?
 	#[instrument(name = "ui::System::run", skip_all)]
 	pub fn run(&mut self, painter: &mut Painter, build_ui: impl FnOnce(&Ui<'_>)) {
+		self.should_redraw.set(false);
+
 		self.persistent_state.hierarchy.get_mut().new_epoch();
 
 		self.input.process_events(&self.viewport, self.persistent_state.hierarchy.get_mut());
@@ -59,6 +60,7 @@ impl System {
 		build_ui(&Ui {
 			stack: Default::default(),
 			widget_constraints: &self.widget_constraints,
+			should_redraw: &self.should_redraw,
 
 			persistent_state: &self.persistent_state,
 			input: &self.input,
@@ -96,6 +98,7 @@ impl System {
 						text_atlas,
 						input: &self.input,
 						widget_id,
+						should_redraw: &self.should_redraw,
 					});
 				}
 			});
