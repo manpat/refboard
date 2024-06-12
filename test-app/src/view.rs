@@ -169,6 +169,14 @@ impl View {
 		});
 
 		ui.with_horizontal_layout(|| {
+			ui.text(format!("{:.2}", self.slider_value))
+				.with_style(|s| s.set_fill(ui::WidgetColorRole::PrimaryContainer))
+				.with_constraints(|c| {
+					c.margin.set(4.0);
+					c.padding.set(4.0);
+				});
+
+			ui.slider(&mut self.slider_value);
 			ui.slider(&mut self.slider_value);
 
 			ui.text(format!("{:.2}", self.slider_value))

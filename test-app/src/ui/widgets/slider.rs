@@ -21,6 +21,9 @@ impl Widget for Slider {
 
 				self.value = (start_value + delta.x / state.handle_travel_length).clamp(0.0, 1.0);
 
+				// TODO(pat.m): make sure this only triggers on actual changes!!!
+				ctx.trigger_redraw();
+
 			} else {
 				state.drag_state = Some((ctx.input.cursor_pos_view.unwrap(), self.value));
 			}
