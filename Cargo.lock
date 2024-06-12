@@ -1892,6 +1892,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tracing-tracy",
+ "unicode-segmentation",
  "wgpu",
  "windows 0.54.0",
  "winit",

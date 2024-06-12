@@ -9,9 +9,11 @@ pub struct View {
 	pub wants_quit: bool,
 	pub frame_counter: Wrapping<u16>,
 
-	pub slider_value: f32,
 	pub button_clicks: u32,
+	pub slider_value: f32,
 	pub checkbox_value: bool,
+
+	pub string_value: String,
 }
 
 impl View {
@@ -22,6 +24,7 @@ impl View {
 			slider_value: 0.5,
 			button_clicks: 0,
 			checkbox_value: false,
+			string_value: String::from("Foobar!"),
 		}
 	}
 
@@ -202,6 +205,14 @@ impl View {
 			ui.toggle(&mut self.checkbox_value);
 			ui.toggle(&mut self.checkbox_value);
 			ui.toggle(&mut self.checkbox_value);
+		})
+		.with_constraints(|c| {
+			c.content_alignment.set(ui::Align::Middle);
+		});
+
+		ui.with_horizontal_layout(|| {
+			ui.text("Text Edit");
+			ui.text_edit(&mut self.string_value);
 		})
 		.with_constraints(|c| {
 			c.content_alignment.set(ui::Align::Middle);

@@ -23,6 +23,7 @@ raw-window-handle = "0.6.0"
 common = { git = "https://github.com/manpat/common-rs.git", rev="911fd5e" }
 
 cosmic-text = "0.11"
+unicode-segmentation = "1.11"
 material-colors = "0.3.3"
 
 tracing = "0.1"

@@ -8,6 +8,7 @@ pub mod checkbox;
 pub mod slider;
 pub mod spring;
 pub mod text;
+pub mod text_edit;
 pub mod toggle;
 
 pub use button::*;
@@ -15,8 +16,11 @@ pub use checkbox::*;
 pub use slider::*;
 pub use spring::*;
 pub use text::*;
+pub use text_edit::*;
 pub use toggle::*;
 
+
+// https://m3.material.io/components
 
 
 impl Ui<'_> {
