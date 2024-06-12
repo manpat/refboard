@@ -8,12 +8,14 @@ pub mod checkbox;
 pub mod slider;
 pub mod spring;
 pub mod text;
+pub mod toggle;
 
 pub use button::*;
 pub use checkbox::*;
 pub use slider::*;
 pub use spring::*;
 pub use text::*;
+pub use toggle::*;
 
 
 

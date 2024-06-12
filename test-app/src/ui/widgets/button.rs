@@ -27,9 +27,10 @@ impl Widget for Button {
 		let base_color = ctx.style.text_color(ctx.app_style);
 		
 		let is_hovered = ctx.input.hovered_widget == Some(ctx.widget_id);
+		let is_active = ctx.input.active_widget == Some(ctx.widget_id);
 
 		// Paint a state layer to convey widget state
-		if is_hovered {
+		if is_hovered || is_active {
 			// TODO(pat.m): should be hot_widget/active_widget?
 			let is_down = ctx.input.is_mouse_down(ui::MouseButton::Left);
 

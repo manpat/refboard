@@ -23,6 +23,10 @@ impl WidgetStyle {
 	pub fn set_outline(&mut self, outline: impl Into<WidgetOutlineStyle>) {
 		self.outline = Some(outline.into());
 	}
+
+	pub fn set_rounding(&mut self, rounding: impl painter::IntoBorderRadii) {
+		self.rounding = Some(rounding.to_radii());
+	}
 }
 
 impl WidgetStyle {
