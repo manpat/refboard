@@ -20,9 +20,9 @@ pub struct Painter {
 
 	scratch_path: PathBuffer,
 
-	color: Color,
-	uv_rect: Option<Aabb2>,
-	clip_rect: Option<Aabb2>,
+	pub color: Color,
+	pub uv_rect: Option<Aabb2>,
+	pub clip_rect: Option<Aabb2>,
 }
 
 impl Painter {

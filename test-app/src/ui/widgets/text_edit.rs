@@ -1,5 +1,5 @@
 use crate::ui::*;
-use cosmic_text::Edit;
+use cosmic_text::{Edit, Cursor};
 
 // TODO(pat.m): more dynamic
 const HACK_FONT_SIZE: f32 = 14.0;
@@ -104,6 +104,9 @@ impl TextEditWidgetState {
 		self.editor.with_buffer_mut(|buffer| {
 			buffer.set_text(&mut atlas.font_system, text, attrs, cosmic_text::Shaping::Advanced);
 		});
+
+		self.editor.set_cursor(Cursor::new(0, 2));
+		self.editor.set_selection(cosmic_text::Selection::Normal(Cursor::new(0, 6)));
 	}
 
 	fn measure(&mut self, atlas: &mut TextAtlas) -> Vec2 {
@@ -123,84 +126,191 @@ impl TextEditWidgetState {
 	}
 
 	fn draw(&mut self, painter: &mut Painter, atlas: &mut ui::TextAtlas, start_pos: impl Into<Vec2>) {
-		use unicode_segmentation::UnicodeSegmentation;
-		
 		let start_pos = start_pos.into();
+		let text_color = painter.color;
 
 		self.editor.with_buffer(|buffer| {
+			// Draw selection highlight and cursor
+			for run in buffer.layout_runs() {
+				self.draw_selection_for_run(painter, &run, start_pos);
+				self.draw_cursor_for_run(painter, &run, start_pos);
+			}
 
-			// stolen from cosmic_text
-			// TODO(pat.m): make work
-			// let line_height = buffer.metrics().line_height;
-			// for run in buffer.layout_runs() {
-			// 	let line_i = run.line_i;
-			// 	let line_y = run.line_y;
-			// 	let line_top = run.line_top;
-
-			// 	if let Some((start, end)) = self.selection_bounds() {
-			// 		if line_i >= start.line && line_i <= end.line {
-			// 			let mut range_opt = None;
-			// 			for glyph in run.glyphs.iter() {
-			// 				// Guess x offset based on characters
-			// 				let cluster = &run.text[glyph.start..glyph.end];
-			// 				let total = cluster.grapheme_indices(true).count();
-			// 				let mut c_x = glyph.x;
-			// 				let c_w = glyph.w / total as f32;
-			// 				for (i, c) in cluster.grapheme_indices(true) {
-			// 					let c_start = glyph.start + i;
-			// 					let c_end = glyph.start + i + c.len();
-			// 					if (start.line != line_i || c_end > start.index)
-			// 						&& (end.line != line_i || c_start < end.index)
-			// 					{
-			// 						range_opt = match range_opt.take() {
-			// 							Some((min, max)) => Some((
-			// 								cmp::min(min, c_x as i32),
-			// 								cmp::max(max, (c_x + c_w) as i32),
-			// 							)),
-			// 							None => Some((c_x as i32, (c_x + c_w) as i32)),
-			// 						};
-			// 					} else if let Some((min, max)) = range_opt.take() {
-			// 						f(
-			// 							min,
-			// 							line_top as i32,
-			// 							cmp::max(0, max - min) as u32,
-			// 							line_height as u32,
-			// 							selection_color,
-			// 						);
-			// 					}
-			// 					c_x += c_w;
-			// 				}
-			// 			}
-
-			// 			if run.glyphs.is_empty() && end.line > line_i {
-			// 				// Highlight all of internal empty lines
-			// 				range_opt = Some((0, buffer.size().0 as i32));
-			// 			}
-
-			// 			if let Some((mut min, mut max)) = range_opt.take() {
-			// 				if end.line > line_i {
-			// 					// Draw to end of line
-			// 					if run.rtl {
-			// 						min = 0;
-			// 					} else {
-			// 						max = buffer.size().0 as i32;
-			// 					}
-			// 				}
-			// 				f(
-			// 					min,
-			// 					line_top as i32,
-			// 					cmp::max(0, max - min) as u32,
-			// 					line_height as u32,
-			// 					selection_color,
-			// 				);
-			// 			}
-			// 		}
-			// 	}
-			// }
-
+			painter.set_color(text_color);
 			painter.draw_text_buffer(buffer, atlas, start_pos);
 		});
+	}
 
+	// Heavily adapted from cosmic_text::Editor::draw
+	fn draw_selection_for_run(&self, painter: &mut Painter, run: &cosmic_text::LayoutRun<'_>, start_pos: Vec2) {
+		use unicode_segmentation::UnicodeSegmentation;
+
+		let Some((start, end)) = self.editor.selection_bounds() else {
+			return
+		};
+
+		let line_idx = run.line_i;
+		if line_idx < start.line || line_idx > end.line {
+			return;
+		}
+
+		let line_top = run.line_top;
+		let (buffer_width, line_height) = self.editor.with_buffer(|buffer| (buffer.size().0, buffer.metrics().line_height));
+
+		// TODO(pat.m): selection color
+		painter.set_color([1.0, 0.5, 1.0, 0.1]);
+
+		let mut range_opt: Option<(f32, f32)> = None;
+
+		// TODO(pat.m): clean this up!
+		for glyph in run.glyphs.iter() {
+			// Guess x offset based on characters
+			let cluster = &run.text[glyph.start..glyph.end];
+			let total = cluster.grapheme_indices(true).count();
+			let mut c_x = glyph.x;
+			let c_w = glyph.w / total as f32;
+
+			for (i, c) in cluster.grapheme_indices(true) {
+				let c_start = glyph.start + i;
+				let c_end = glyph.start + i + c.len();
+
+				if (start.line != line_idx || c_end > start.index)
+					&& (end.line != line_idx || c_start < end.index)
+				{
+					range_opt = match range_opt.take() {
+						Some((min, max)) => Some((
+							min.min(c_x),
+							max.max(c_x + c_w),
+						)),
+
+						None => Some((c_x, c_x + c_w)),
+					};
+
+				} else if let Some((min_x, max_x)) = range_opt.take() {
+					let min = start_pos + Vec2::new(min_x, line_top);
+					let max = start_pos + Vec2::new(max_x.max(min_x), line_top + line_height);
+
+					painter.rect(Aabb2{min, max});
+				}
+
+				c_x += c_w;
+			}
+		}
+
+		if run.glyphs.is_empty() && end.line > line_idx {
+			// Highlight all of internal empty lines
+			range_opt = Some((0.0, buffer_width));
+		}
+
+		if let Some((mut min_x, mut max_x)) = range_opt.take() {
+			if end.line > line_idx {
+				// Draw to end of line
+				if run.rtl {
+					min_x = 0.0;
+				} else {
+					max_x = buffer_width;
+				}
+			}
+
+			let min = start_pos + Vec2::new(min_x, line_top);
+			let max = start_pos + Vec2::new(max_x.max(min_x), line_top + line_height);
+
+			painter.rect(Aabb2{min, max});
+		}
+	}
+
+	// Heavily adapted from cosmic_text::Editor::draw
+	fn draw_cursor_for_run(&self, painter: &mut Painter, run: &cosmic_text::LayoutRun<'_>, start_pos: Vec2) {
+		use unicode_segmentation::UnicodeSegmentation;
+
+		let cursor = self.editor.cursor();
+
+		// Cursor isn't on this line
+		if cursor.line != run.line_i {
+			return;
+		}
+
+		// Search for the index of the glyph after the cursor, or if the cursor is within a cluster
+		// the index of the containing glyph and an approximate offset indicating which grapheme within the cluster.
+		let (glyph_index, glyph_offset) = 'search: {
+			for (glyph_i, glyph) in run.glyphs.iter().enumerate() {
+				// Exact match, nice and easy
+				if cursor.index == glyph.start {
+					break 'search (glyph_i, 0.0);
+
+				// Cursor is within a cluster, estimate offset.
+				} else if cursor.index > glyph.start && cursor.index < glyph.end {
+					let mut before = 0;
+					let mut total = 0;
+
+					let cluster = &run.text[glyph.start..glyph.end];
+					for (i, _) in cluster.grapheme_indices(true) {
+						if glyph.start + i < cursor.index {
+							before += 1;
+						}
+						total += 1;
+					}
+
+					let offset = glyph.w * (before as f32) / (total as f32);
+					break 'search (glyph_i, offset);
+				}
+			}
+
+			// cursor.index > num glyphs, so snap it to the end of the last glyph if there is one,
+			// otherwise the line is empty so the start of the line is the only reasonable place.
+			match run.glyphs.last() {
+				Some(glyph) => {
+					if cursor.index == glyph.end {
+						break 'search (run.glyphs.len(), 0.0);
+					}
+				}
+				None => {
+					break 'search (0, 0.0);
+				}
+			}
+
+			// If we can't find what we're looking for, then bail entirely
+			return;
+		};
+
+
+		// Get the glyph found above and calculate an appropriate position for the cursor.
+		let cursor_x = match run.glyphs.get(glyph_index) {
+			Some(glyph) => {
+				// Start of detected glyph
+				if glyph.level.is_rtl() {
+					glyph.x + glyph.w - glyph_offset
+				} else {
+					glyph.x + glyph_offset
+				}
+			}
+
+			None => match run.glyphs.last() {
+				Some(glyph) => {
+					// End of last glyph
+					if glyph.level.is_rtl() {
+						glyph.x
+					} else {
+						glyph.x + glyph.w
+					}
+				}
+
+				None => {
+					// Start of empty line
+					0.0
+				}
+			}
+		};
+
+		let line_height = self.editor.with_buffer(|buffer| buffer.metrics().line_height);
+
+		let line_top = run.line_top;
+		let start = start_pos + Vec2::new(cursor_x, line_top);
+		let end = start_pos + Vec2::new(cursor_x, line_top + line_height);
+
+		// TODO(pat.m): cursor color
+		painter.set_color([1.0; 4]);
+		painter.line(start, end);
 	}
 }
 
