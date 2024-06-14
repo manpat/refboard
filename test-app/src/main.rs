@@ -37,6 +37,7 @@ pub mod prelude {
 
 	pub use std::collections::{VecDeque, HashMap, HashSet};
 	pub use std::cell::{Cell, RefCell};
+	pub use std::num::Wrapping;
 	
 	pub use tracing;
 	#[doc(hidden)]

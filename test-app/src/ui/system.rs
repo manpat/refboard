@@ -33,14 +33,17 @@ impl System {
 		if self.viewport.size.to_vec2i() != new_size {
 			self.should_redraw.set(true);
 			self.viewport.size = new_size.to_vec2();
+			self.input.set_viewport(self.viewport);
 		}
 	}
 
 	pub fn prepare_next_frame(&mut self) {
 		self.input.reset();
+		self.input.set_viewport(self.viewport);
 	}
 
 	pub fn should_redraw(&self) -> bool {
+		// TODO(pat.m): only redraw on input events that actually change state
 		self.should_redraw.get() || self.input.events_received_this_frame
 	}
 
@@ -51,7 +54,7 @@ impl System {
 
 		self.persistent_state.hierarchy.get_mut().new_epoch();
 
-		self.input.process_events(&self.viewport, self.persistent_state.hierarchy.get_mut());
+		self.input.process_events(self.persistent_state.hierarchy.get_mut());
 
 		self.widget_constraints.get_mut().clear();
 
@@ -263,26 +266,27 @@ impl System {
 		// Debug visualisation
 		// TODO(pat.m): make this a debug setting
 		painter.set_clip_rect(None);
+		painter.set_line_width(1.0);
 
 		if false {
-			if let Some(hovered_widget) = self.input.hovered_widget {
-				painter.set_color(Color::light_cyan());
-				self.debug_widget(painter, hovered_widget);
-			}
+			// if let Some(hovered_widget) = self.input.hovered_widget {
+			// 	painter.set_color(Color::light_cyan());
+			// 	self.debug_widget(painter, hovered_widget);
+			// }
 
 			if let Some(focus_widget) = self.input.focus_widget {
 				painter.set_color(Color::light_red());
 				self.debug_widget(painter, focus_widget);
 			}
 
-			if let Some(active_widget) = self.input.active_widget {
-				painter.set_color(Color::light_green());
-				self.debug_widget(painter, active_widget);
-			}
+			// if let Some(active_widget) = self.input.active_widget {
+			// 	painter.set_color(Color::light_green());
+			// 	self.debug_widget(painter, active_widget);
+			// }
 
-			hierarchy.visit_breadth_first(|widget_id, _| {
-				self.debug_widget(painter, widget_id);
-			});
+			// hierarchy.visit_breadth_first(|widget_id, _| {
+			// 	self.debug_widget(painter, widget_id);
+			// });
 		}
 	}
 

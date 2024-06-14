@@ -1,5 +1,5 @@
 use crate::ui::*;
-use cosmic_text::{Edit, Cursor};
+use cosmic_text::{Edit, /*Cursor*/};
 
 // TODO(pat.m): more dynamic
 const HACK_FONT_SIZE: f32 = 14.0;
@@ -16,16 +16,20 @@ pub struct TextEdit {
 #[derive(Debug)]
 pub struct TextEditWidgetState {
 	editor: cosmic_text::Editor<'static>,
+	origin: Vec2,
+	active: bool,
 }
 
 impl Widget for TextEdit {
-	fn lifecycle(&mut self, ctx: LifecycleContext<'_>) {
+	fn lifecycle(&mut self, mut ctx: LifecycleContext<'_>) {
 		if ctx.event == WidgetLifecycleEvent::Destroyed {
 			return
 		}
 
 		let state = self.get_state_or_else(ctx.state, || TextEditWidgetState::new(ctx.text_atlas));
+
 		state.update(ctx.text_atlas, &self.text);
+		self.handle_input(&mut ctx);
 	}
 
 	fn configure(&self, ctx: ConfigureContext<'_>) {
@@ -76,6 +80,36 @@ impl Widget for TextEdit {
 }
 
 
+impl TextEdit {
+	fn handle_input(&mut self, ctx: &mut LifecycleContext<'_>) {
+		use cosmic_text::Action;
+
+		let state = self.get_state(ctx.state);
+
+		let is_hovered = ctx.input.hovered_widget == Some(ctx.widget_id);
+		let is_focussed = ctx.input.focus_widget == Some(ctx.widget_id);
+		let is_active = ctx.input.active_widget == Some(ctx.widget_id);
+
+		state.active = is_focussed || is_active;
+
+		if !state.active {
+			return
+		}
+
+		let Some(mouse_pos) = ctx.input.cursor_pos else { return };
+		let relative_mouse = mouse_pos - state.origin;
+
+		if is_hovered && ctx.input.was_mouse_pressed(ui::MouseButton::Left) {
+			state.editor.action(&mut ctx.text_atlas.font_system, Action::Click {
+				x: relative_mouse.x as i32,
+				y: relative_mouse.y as i32,
+			});
+		}
+
+		// if ctx.input.
+	}
+}
+
 
 impl TextEditWidgetState {
 	fn new(atlas: &mut TextAtlas) -> Self {
@@ -90,7 +124,11 @@ impl TextEditWidgetState {
 		let mut editor = cosmic_text::Editor::new(buffer);
 		editor.shape_as_needed(font_system, true);
 
-		TextEditWidgetState {editor}
+		TextEditWidgetState {
+			editor,
+			origin: Vec2::zero(),
+			active: false,
+		}
 	}
 
 	fn update(&mut self, atlas: &mut TextAtlas, text: &str) {
@@ -104,9 +142,6 @@ impl TextEditWidgetState {
 		self.editor.with_buffer_mut(|buffer| {
 			buffer.set_text(&mut atlas.font_system, text, attrs, cosmic_text::Shaping::Advanced);
 		});
-
-		self.editor.set_cursor(Cursor::new(0, 2));
-		self.editor.set_selection(cosmic_text::Selection::Normal(Cursor::new(0, 6)));
 	}
 
 	fn measure(&mut self, atlas: &mut TextAtlas) -> Vec2 {
@@ -131,14 +166,18 @@ impl TextEditWidgetState {
 
 		self.editor.with_buffer(|buffer| {
 			// Draw selection highlight and cursor
-			for run in buffer.layout_runs() {
-				self.draw_selection_for_run(painter, &run, start_pos);
-				self.draw_cursor_for_run(painter, &run, start_pos);
+			if self.active {
+				for run in buffer.layout_runs() {
+					self.draw_selection_for_run(painter, &run, start_pos);
+					self.draw_cursor_for_run(painter, &run, start_pos);
+				}
 			}
 
 			painter.set_color(text_color);
 			painter.draw_text_buffer(buffer, atlas, start_pos);
 		});
+
+		self.origin = start_pos;
 	}
 
 	// Heavily adapted from cosmic_text::Editor::draw
@@ -310,6 +349,7 @@ impl TextEditWidgetState {
 
 		// TODO(pat.m): cursor color
 		painter.set_color([1.0; 4]);
+		painter.set_line_width(1.0);
 		painter.line(start, end);
 	}
 }
@@ -323,8 +363,12 @@ impl StatefulWidget for TextEdit {
 
 impl Ui<'_> {
 	pub fn text_edit(&self, s: &mut String) -> WidgetRef<'_, TextEdit> {
-		self.add_widget(TextEdit {
-			text: s.clone(),
-		})
+		let widget = self.add_widget(TextEdit {
+			text: std::mem::take(s),
+		});
+
+		*s = std::mem::take(&mut widget.widget().text);
+
+		widget
 	}
 }

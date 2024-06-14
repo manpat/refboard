@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Viewport {
 	pub size: Vec2,
 }

@@ -17,7 +17,7 @@ impl Widget for Slider {
 
 		if is_active {
 			if let Some((start_pos, start_value)) = state.drag_state {
-				let delta = ctx.input.cursor_pos_view.unwrap_or(start_pos) - start_pos;
+				let delta = ctx.input.cursor_pos.unwrap_or(start_pos) - start_pos;
 
 				self.value = (start_value + delta.x / state.handle_travel_length).clamp(0.0, 1.0);
 
@@ -25,7 +25,7 @@ impl Widget for Slider {
 				ctx.trigger_redraw();
 
 			} else {
-				state.drag_state = Some((ctx.input.cursor_pos_view.unwrap(), self.value));
+				state.drag_state = Some((ctx.input.cursor_pos.unwrap(), self.value));
 			}
 		} else {
 			state.drag_state = None;

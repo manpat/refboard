@@ -8,9 +8,7 @@ pub use winit::window::ResizeDirection;
 
 #[derive(Default, Debug)]
 pub struct Input {
-	raw_cursor_pos: Option<Vec2>,
-
-	pub cursor_pos_view: Option<Vec2>,
+	pub cursor_pos: Option<Vec2>,
 
 	pub events_received_this_frame: bool,
 
@@ -20,19 +18,21 @@ pub struct Input {
 
 	pub registered_widgets: HashMap<ui::WidgetId, RegisteredWidget>,
 
-	// All events that happened this frame.
-	events: Vec<InputEvent>,
-
 	// The state of each mouse button as it is after all mouse events are processed.
-	mouse_states: HashMap<MouseButton, bool>,
+	button_states: [MouseButtonState; 5],
+
+	viewport: ui::Viewport,
+	timestamp: Wrapping<u32>,
 }
 
 impl Input {
 	pub fn reset(&mut self) {
-		self.events.clear();
-
-		self.cursor_pos_view = None;
 		self.events_received_this_frame = false;
+		self.timestamp += 1;
+	}
+
+	pub fn set_viewport(&mut self, viewport: ui::Viewport) {
+		self.viewport = viewport;
 	}
 
 	#[instrument(skip_all)]
@@ -42,26 +42,21 @@ impl Input {
 		match event {
 			WindowEvent::CursorMoved { position, .. } => {
 				let PhysicalPosition {x, y} = position.cast();
-				let raw_pos = Vec2::new(x, y);
-
-				self.raw_cursor_pos = Some(raw_pos);
-				self.events.push(InputEvent::MouseMove(raw_pos));
+				let cursor_pos = self.viewport.physical_to_view() * Vec2::new(x, y);
+				self.cursor_pos = Some(cursor_pos);
 
 				// TODO(pat.m): queue mouse move events so we don't lose precision
 				// maybe this can be opt in?
 			}
 
 			WindowEvent::CursorLeft { .. } => {
-				self.raw_cursor_pos = None;
-				self.cursor_pos_view = None;
+				self.cursor_pos = None;
 				self.hovered_widget = None;
 			}
 
 			WindowEvent::MouseInput { state: ElementState::Released, button, .. } => {
 				if let Some(button) = MouseButton::try_from_winit(button) {
-					self.events.push(InputEvent::MouseUp(button));
-					self.mouse_states.insert(button, false);
-
+					self.button_state_mut(button).up_timestamp = self.timestamp.0;
 					self.active_widget = None;
 				}
 			}
@@ -84,8 +79,11 @@ impl Input {
 					}
 				}
 
-				self.events.push(InputEvent::MouseDown(button));
-				self.mouse_states.insert(button, true);
+				// No mouse downs without a position
+				if let Some(cursor_pos) = self.cursor_pos {
+					self.button_state_mut(button).down_timestamp = self.timestamp.0;
+					self.button_state_mut(button).last_press_position = cursor_pos;
+				}
 			}
 
 			_ => {}
@@ -95,11 +93,8 @@ impl Input {
 	}
 
 	#[instrument(skip_all)]
-	pub fn process_events(&mut self, viewport: &ui::Viewport, hierarchy: &ui::Hierarchy) {
-		self.cursor_pos_view = self.raw_cursor_pos
-			.map(|raw_pos| viewport.physical_to_view() * raw_pos);
-
-		if let Some(cursor_pos) = self.cursor_pos_view {
+	pub fn process_events(&mut self, hierarchy: &ui::Hierarchy) {
+		if let Some(cursor_pos) = self.cursor_pos {
 			// TODO(pat.m): instead of just storing the last hovered widget, store a 'stack' of hovered widgets
 			hierarchy.visit_breadth_first(|widget_id, _| {
 				if let Some(widget_info) = self.registered_widgets.get(&widget_id)
@@ -112,8 +107,8 @@ impl Input {
 
 		// TODO(pat.m): this is completely bogus
 		if self.hovered_widget.is_some() {
-			if self.events.iter()
-				.any(|e| matches!(e, InputEvent::MouseUp(_)))
+			if self.button_states.iter()
+				.any(|s| s.up_timestamp == self.timestamp.0)
 			{
 				self.focus_widget = self.hovered_widget;
 			}
@@ -150,6 +145,14 @@ impl Input {
 			!blocks_input_to_children
 		});
 	}
+
+	fn button_state(&self, button: MouseButton) -> &MouseButtonState {
+		&self.button_states[button as usize]
+	}
+
+	fn button_state_mut(&mut self, button: MouseButton) -> &mut MouseButtonState {
+		&mut self.button_states[button as usize]
+	}
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -161,46 +164,30 @@ pub enum SendEventResponse {
 
 
 impl Input {
-	pub fn all_events(&self) -> &[InputEvent] {
-		&self.events
-	}
-
 	/// Get the last state of a mouse button
 	pub fn is_mouse_down(&self, button: MouseButton) -> bool {
-		self.mouse_states.get(&button).copied()
-			.unwrap_or(false)
+		self.button_state(button).is_down()
 	}
 
 	pub fn is_any_mouse_down(&self) -> bool {
-		self.mouse_states.iter()
-			.any(|(_, v)| *v)
+		self.button_states.iter()
+			.any(|state| state.is_down())
 	}
 
 	/// Returns whether the last event for a mouse button was a down event
 	pub fn was_mouse_pressed(&self, button: MouseButton) -> bool {
-		let last_evt = self.events.iter()
-			.rfind(|e| e.concerns_mouse_button(button));
-
-		match last_evt {
-			Some(InputEvent::MouseDown(_)) => true,
-			_ => false,
-		}
+		self.button_state(button).down_timestamp == self.timestamp.0
 	}
 
 	/// Returns whether the last event for a mouse button was an up event
 	pub fn was_mouse_released(&self, button: MouseButton) -> bool {
-		let last_evt = self.events.iter()
-			.rfind(|e| e.concerns_mouse_button(button));
-
-		match last_evt {
-			Some(InputEvent::MouseUp(_)) => true,
-			_ => false,
-		}
+		self.button_state(button).up_timestamp == self.timestamp.0
 	}
 }
 
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[repr(u8)]
 pub enum MouseButton {
 	Left,
 	Right,
@@ -221,30 +208,6 @@ impl MouseButton {
 		}
 	}
 }
-
-#[derive(Debug, Clone)]
-pub enum InputEvent {
-	MouseDown(MouseButton),
-	MouseUp(MouseButton),
-
-	MouseMove(Vec2),
-
-	// TODO(pat.m): character input events
-	// TODO(pat.m): key events
-}
-
-impl InputEvent {
-	pub fn concerns_mouse_button(&self, desired_button: MouseButton) -> bool {
-		match self {
-			InputEvent::MouseUp(button) => desired_button == *button,
-			InputEvent::MouseDown(button) => desired_button == *button,
-
-			#[allow(unreachable_patterns)]
-			_ => false
-		}
-	}
-}
-
 
 
 bitflags! {
@@ -276,4 +239,17 @@ impl Default for InputBehaviour {
 pub struct RegisteredWidget {
 	pub bounds: Aabb2,
 	pub behaviour: InputBehaviour,
+}
+
+#[derive(Debug, Default)]
+pub struct MouseButtonState {
+	pub last_press_position: Vec2,
+	pub down_timestamp: u32,
+	pub up_timestamp: u32,
+}
+
+impl MouseButtonState {
+	pub fn is_down(&self) -> bool {
+		self.down_timestamp > self.up_timestamp
+	}
 }
