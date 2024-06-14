@@ -24,7 +24,7 @@ impl View {
 			slider_value: 0.5,
 			button_clicks: 0,
 			checkbox_value: false,
-			string_value: String::from("Foobar!"),
+			string_value: String::from("Foobar! I am some text. Hee hee ho ho\na newline? 👀\n\nOh My 🦐\nاَلْعَرَبِيَّةُ"),
 		}
 	}
 

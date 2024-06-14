@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use winit::event::{WindowEvent, ElementState, MouseButton as WinitMouseButton};
+use winit::event::{WindowEvent, KeyEvent, ElementState, MouseButton as WinitMouseButton};
 use winit::dpi::PhysicalPosition;
 
 pub use winit::window::ResizeDirection;
@@ -17,6 +17,7 @@ pub struct Input {
 	pub focus_widget: Option<ui::WidgetId>,
 
 	pub registered_widgets: HashMap<ui::WidgetId, RegisteredWidget>,
+	pub keyboard_input: Vec<KeyboardEvent>,
 
 	// The state of each mouse button as it is after all mouse events are processed.
 	button_states: [MouseButtonState; 5],
@@ -27,6 +28,7 @@ pub struct Input {
 
 impl Input {
 	pub fn reset(&mut self) {
+		self.keyboard_input.clear();
 		self.events_received_this_frame = false;
 		self.timestamp += 1;
 	}
@@ -84,6 +86,14 @@ impl Input {
 					self.button_state_mut(button).down_timestamp = self.timestamp.0;
 					self.button_state_mut(button).last_press_position = cursor_pos;
 				}
+			}
+
+			WindowEvent::KeyboardInput { event, .. } => {
+				if let Some(text) = event.text {
+					self.keyboard_input.extend(text.chars().map(KeyboardEvent::Character));
+				}
+
+				// TODO(pat.m): key chords, modifiers
 			}
 
 			_ => {}
@@ -183,6 +193,15 @@ impl Input {
 	pub fn was_mouse_released(&self, button: MouseButton) -> bool {
 		self.button_state(button).up_timestamp == self.timestamp.0
 	}
+
+	pub fn mouse_drag_delta(&self, button: MouseButton) -> Option<Vec2> {
+		let state = self.button_state(button);
+		if state.is_down() {
+			Some(self.cursor_pos? - state.last_press_position)
+		} else {
+			None
+		}
+	}
 }
 
 
@@ -252,4 +271,10 @@ impl MouseButtonState {
 	pub fn is_down(&self) -> bool {
 		self.down_timestamp > self.up_timestamp
 	}
+}
+
+#[non_exhaustive]
+#[derive(Copy, Clone, Debug)]
+pub enum KeyboardEvent {
+	Character(char),
 }

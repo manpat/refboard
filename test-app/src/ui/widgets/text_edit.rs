@@ -29,7 +29,21 @@ impl Widget for TextEdit {
 		let state = self.get_state_or_else(ctx.state, || TextEditWidgetState::new(ctx.text_atlas));
 
 		state.update(ctx.text_atlas, &self.text);
-		self.handle_input(&mut ctx);
+		if self.handle_input(&mut ctx) {
+			let state = self.get_state(ctx.state);
+
+			self.text.clear();
+
+			state.editor.with_buffer(|buffer| {
+				for line in buffer.lines.iter() {
+					self.text.push_str(line.text());
+					self.text.push('\n');
+				}
+
+				// Pop the final newline if there is one
+				self.text.pop();
+			})
+		}
 	}
 
 	fn configure(&self, ctx: ConfigureContext<'_>) {
@@ -75,13 +89,13 @@ impl Widget for TextEdit {
 		};
 
 		ctx.painter.set_color(text_color);
-		state.draw(ctx.painter, ctx.text_atlas, start_pos);
+		state.draw(ctx.painter, ctx.text_atlas, start_pos, ctx.app_style);
 	}
 }
 
 
 impl TextEdit {
-	fn handle_input(&mut self, ctx: &mut LifecycleContext<'_>) {
+	fn handle_input(&mut self, ctx: &mut LifecycleContext<'_>) -> bool {
 		use cosmic_text::Action;
 
 		let state = self.get_state(ctx.state);
@@ -93,20 +107,41 @@ impl TextEdit {
 		state.active = is_focussed || is_active;
 
 		if !state.active {
-			return
+			return false
 		}
 
-		let Some(mouse_pos) = ctx.input.cursor_pos else { return };
+		let Some(mouse_pos) = ctx.input.cursor_pos else { return false };
 		let relative_mouse = mouse_pos - state.origin;
 
-		if is_hovered && ctx.input.was_mouse_pressed(ui::MouseButton::Left) {
-			state.editor.action(&mut ctx.text_atlas.font_system, Action::Click {
-				x: relative_mouse.x as i32,
-				y: relative_mouse.y as i32,
-			});
+		if is_hovered {
+			if ctx.input.was_mouse_pressed(ui::MouseButton::Left) {
+				state.editor.action(&mut ctx.text_atlas.font_system, Action::Click {
+					x: relative_mouse.x as i32,
+					y: relative_mouse.y as i32,
+				});
+			}
+
+			if let Some(_) = ctx.input.mouse_drag_delta(ui::MouseButton::Left) {
+				state.editor.action(&mut ctx.text_atlas.font_system, Action::Drag {
+					x: relative_mouse.x as i32,
+					y: relative_mouse.y as i32,
+				});
+			}
 		}
 
-		// if ctx.input.
+		for event in ctx.input.keyboard_input.iter() {
+			match event {
+				ui::KeyboardEvent::Character(ch) => {
+					state.editor.action(&mut ctx.text_atlas.font_system, Action::Insert(*ch));
+				}
+
+				_ => {}
+			}
+		}
+
+		state.editor.shape_as_needed(&mut ctx.text_atlas.font_system, true);
+
+		true
 	}
 }
 
@@ -160,7 +195,7 @@ impl TextEditWidgetState {
 		})
 	}
 
-	fn draw(&mut self, painter: &mut Painter, atlas: &mut ui::TextAtlas, start_pos: impl Into<Vec2>) {
+	fn draw(&mut self, painter: &mut Painter, atlas: &mut ui::TextAtlas, start_pos: impl Into<Vec2>, app_style: &AppStyle) {
 		let start_pos = start_pos.into();
 		let text_color = painter.color;
 
@@ -168,7 +203,7 @@ impl TextEditWidgetState {
 			// Draw selection highlight and cursor
 			if self.active {
 				for run in buffer.layout_runs() {
-					self.draw_selection_for_run(painter, &run, start_pos);
+					self.draw_selection_for_run(painter, &run, start_pos, app_style);
 					self.draw_cursor_for_run(painter, &run, start_pos);
 				}
 			}
@@ -181,7 +216,7 @@ impl TextEditWidgetState {
 	}
 
 	// Heavily adapted from cosmic_text::Editor::draw
-	fn draw_selection_for_run(&self, painter: &mut Painter, run: &cosmic_text::LayoutRun<'_>, start_pos: Vec2) {
+	fn draw_selection_for_run(&self, painter: &mut Painter, run: &cosmic_text::LayoutRun<'_>, start_pos: Vec2, app_style: &AppStyle) {
 		use unicode_segmentation::UnicodeSegmentation;
 
 		let Some((start, end)) = self.editor.selection_bounds() else {
@@ -196,8 +231,10 @@ impl TextEditWidgetState {
 		let line_top = run.line_top;
 		let (buffer_width, line_height) = self.editor.with_buffer(|buffer| (buffer.size().0, buffer.metrics().line_height));
 
-		// TODO(pat.m): selection color
-		painter.set_color([1.0, 0.5, 1.0, 0.1]);
+		let selection_color = app_style.resolve_color_role(WidgetColorRole::OnSurface)
+			.with_alpha(0.1);
+
+		painter.set_color(selection_color);
 
 		let mut range_opt: Option<(f32, f32)> = None;
 
