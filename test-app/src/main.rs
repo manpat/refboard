@@ -47,15 +47,19 @@ pub mod prelude {
 
 fn main() -> anyhow::Result<()> {
 	std::env::set_var("RUST_BACKTRACE", "1");
+	std::env::set_var("RUST_LOG", "test_app=trace");
 
-	env_logger::init();
+	env_logger::builder()
+		.parse_default_env()
+		.format_timestamp_millis()
+		.init();
 
 	#[cfg(feature="tracy")]
 	init_tracy();
 
 	let event_loop = EventLoop::new()?;
 	event_loop.set_control_flow(ControlFlow::Wait);
-	event_loop.run_app(&mut ApplicationHost::new())
+	event_loop.run_app(&mut ApplicationHost::new()?)
 		.map_err(Into::into)
 }
 
@@ -71,12 +75,15 @@ fn init_tracy() {
     tracing::subscriber::set_global_default(subscriber)
     	.expect("set up the subscriber");
     	
-	println!("tracy init");
+	log::trace!("tracy init");
 }
 
 
 
 struct ApplicationHost {
+	gfx_core: renderer::GraphicsCore,
+	shared_resources: renderer::SharedResources,
+
 	ui_system: ui::System,
 	painter: painter::Painter,
 	view: view::View,
@@ -85,18 +92,24 @@ struct ApplicationHost {
 }
 
 impl ApplicationHost {
-	pub fn new() -> Self {
+	pub fn new() -> anyhow::Result<Self> {
+		let gfx_core = pollster::block_on(renderer::GraphicsCore::new())?;
+		let shared_resources = renderer::SharedResources::new(&gfx_core)?;
+
 		let painter = painter::Painter::new();
 		let ui_system = ui::System::new();
 		let view = view::View::new();
 
-		ApplicationHost {
+		Ok(ApplicationHost {
+			gfx_core,
+			shared_resources,
+
 			painter,
 			ui_system,
 			view,
 
 			app_window: None,
-		}
+		})
 	}
 
 	fn redraw(&mut self) {
@@ -109,10 +122,11 @@ impl ApplicationHost {
 			self.view.build(ui);
 		});
 		
-		renderer.prepare(&self.painter, &self.ui_system.viewport, &mut *self.ui_system.text_atlas.borrow_mut());
+		renderer.prepare(&self.gfx_core, &self.shared_resources, &self.painter,
+			&self.ui_system.viewport, &mut *self.ui_system.text_atlas.borrow_mut());
 
 		window.pre_present_notify();
-		renderer.present();
+		renderer.present(&self.gfx_core, &self.shared_resources);
 
 		self.ui_system.prepare_next_frame();
 	}
@@ -129,7 +143,7 @@ impl ApplicationHandler for ApplicationHost {
 			.with_visible(false);
 
 		let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
-		let renderer = pollster::block_on(renderer::Renderer::start(window.clone())).unwrap();
+		let renderer = renderer::Renderer::new(&self.gfx_core, &self.shared_resources, window.clone()).unwrap();
 
 		self.ui_system.set_size({
 			let physical_size = window.inner_size().cast();
@@ -146,7 +160,7 @@ impl ApplicationHandler for ApplicationHost {
 		window.set_visible(true);
 	}
 
-	fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
+	fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
 		match event {
 			WindowEvent::RedrawRequested => {
 				self.redraw();
@@ -159,7 +173,7 @@ impl ApplicationHandler for ApplicationHost {
 					return
 				};
 
-				renderer.resize(new_physical_size.width, new_physical_size.height);
+				renderer.resize(&self.gfx_core, new_physical_size.width, new_physical_size.height);
 				self.ui_system.set_size(Vec2i::new(new_physical_size.width as i32, new_physical_size.height as i32));
 
 				let Vec2i{x, y} = self.ui_system.min_size;
@@ -189,13 +203,13 @@ impl ApplicationHandler for ApplicationHost {
 				match self.ui_system.input.send_event(event) {
 					ui::SendEventResponse::DragWindow => {
 						if let Err(err) = window.drag_window() {
-							println!("Window drag failed {err}");
+							log::error!("Window drag failed {err}");
 						}
 					}
 
 					ui::SendEventResponse::DragResizeWindow(resize_direction) => {
 						if let Err(err) = window.drag_resize_window(resize_direction) {
-							println!("Window drag resize failed {err}");
+							log::error!("Window drag resize failed {err}");
 						}
 					}
 
@@ -241,3 +255,4 @@ struct ApplicationWindow {
 	window: Arc<Window>,
 	renderer: renderer::Renderer,
 }
+

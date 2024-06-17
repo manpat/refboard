@@ -1789,6 +1789,7 @@ dependencies = [
  "common",
  "cosmic-text",
  "env_logger",
+ "log",
  "lyon",
  "material-colors",
  "pollster",
