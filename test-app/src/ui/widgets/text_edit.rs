@@ -153,11 +153,10 @@ impl TextEditWidgetState {
 
 		let font_system = &mut atlas.font_system;
 		let mut buffer = cosmic_text::Buffer::new(font_system, metrics);
-		buffer.set_size(font_system, 1000.0, 1000.0);
+		buffer.set_size(font_system, f32::INFINITY, 1000.0);
 		buffer.set_wrap(font_system, cosmic_text::Wrap::None);
 
-		let mut editor = cosmic_text::Editor::new(buffer);
-		editor.shape_as_needed(font_system, true);
+		let editor = cosmic_text::Editor::new(buffer);
 
 		TextEditWidgetState {
 			editor,

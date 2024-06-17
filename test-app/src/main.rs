@@ -15,20 +15,18 @@ pub mod ui;
 
 pub mod renderer;
 pub mod painter;
-pub mod app;
 pub mod view;
 pub mod util;
 
 pub mod prelude {
 	pub use common::*;
 
-	pub use super::{painter, renderer, app, view, ui};
+	pub use super::{painter, renderer, view, ui};
 	pub use super::util::*;
 
 	pub use ui::{StatefulWidget};
 	
 	pub use painter::Painter;
-	pub use app::{ItemKey, ImageKey};
 
 	pub use smallvec::SmallVec;
 	pub use slotmap::{SlotMap, SecondaryMap};
@@ -76,7 +74,6 @@ async fn main() -> anyhow::Result<()> {
 		Vec2i::new(physical_size.width, physical_size.height)
 	});
 
-	let mut app = app::App::default();
 	let mut view = view::View::new();
 
 	event_loop.set_control_flow(ControlFlow::Wait);
@@ -88,7 +85,7 @@ async fn main() -> anyhow::Result<()> {
 			// Initial present/show window
 			Event::NewEvents(StartCause::Init) => {
 				ui_system.run(&mut painter, |ui| {
-					view.build(ui, &app);
+					view.build(ui);
 				});
 
 				renderer.prepare(&painter, &ui_system.viewport, &mut *ui_system.text_atlas.borrow_mut());
@@ -105,15 +102,13 @@ async fn main() -> anyhow::Result<()> {
 					WindowEvent::RedrawRequested => {
 						painter.clear();
 						ui_system.run(&mut painter, |ui| {
-							view.build(ui, &app);
+							view.build(ui);
 						});
 						
 						renderer.prepare(&painter, &ui_system.viewport, &mut *ui_system.text_atlas.borrow_mut());
 
 						window.pre_present_notify();
 						renderer.present();
-
-						app.apply_changes();
 
 						ui_system.prepare_next_frame();
 					}
@@ -170,11 +165,6 @@ async fn main() -> anyhow::Result<()> {
 
 				if view.wants_quit {
 					target.exit();
-				}
-
-				if app.hack_changed.get() {
-					app.hack_changed.set(false);
-					window.request_redraw();
 				}
 
 				if ui_system.should_redraw() {
