@@ -208,6 +208,7 @@ impl TextEditWidgetState {
 				}
 			}
 
+			// TODO(pat.m): make selection bounds effect text colour
 			painter.set_color(text_color);
 			painter.draw_text_buffer(buffer, atlas, start_pos);
 		});
@@ -215,84 +216,39 @@ impl TextEditWidgetState {
 		self.origin = start_pos;
 	}
 
-	// Heavily adapted from cosmic_text::Editor::draw
 	fn draw_selection_for_run(&self, painter: &mut Painter, run: &cosmic_text::LayoutRun<'_>, start_pos: Vec2, app_style: &AppStyle) {
-		use unicode_segmentation::UnicodeSegmentation;
-
-		let Some((start, end)) = self.editor.selection_bounds() else {
+		let Some((cursor_start, cursor_end)) = self.editor.selection_bounds() else {
 			return
 		};
 
-		let line_idx = run.line_i;
-		if line_idx < start.line || line_idx > end.line {
-			return;
+		let line_index = run.line_i;
+		if line_index < cursor_start.line || line_index > cursor_end.line {
+			return
 		}
 
 		let line_top = run.line_top;
-		let (buffer_width, line_height) = self.editor.with_buffer(|buffer| (buffer.size().0, buffer.metrics().line_height));
+		let line_height = self.editor.with_buffer(|buffer| buffer.metrics().line_height);
+
+		let empty_indicator_width = 5.0;
+
+		let line_top_left = start_pos + Vec2::from_y(line_top);
+		let line_bottom_left = line_top_left + Vec2::from_y(line_height);
+
+		let selection_extends_to_next_line = line_index < cursor_end.line;
+
+		let (start_x, mut width) = run.highlight(cursor_start, cursor_end).unwrap_or((0.0, 0.0));
+		if selection_extends_to_next_line {
+			width += empty_indicator_width;
+		}
+
+		let min = line_top_left + Vec2::from_x(start_x);
+		let max = line_bottom_left + Vec2::from_x(start_x + width);
 
 		let selection_color = app_style.resolve_color_role(WidgetColorRole::OnSurface)
 			.with_alpha(0.1);
 
 		painter.set_color(selection_color);
-
-		let mut range_opt: Option<(f32, f32)> = None;
-
-		// TODO(pat.m): clean this up!
-		for glyph in run.glyphs.iter() {
-			// Guess x offset based on characters
-			let cluster = &run.text[glyph.start..glyph.end];
-			let total = cluster.grapheme_indices(true).count();
-			let mut c_x = glyph.x;
-			let c_w = glyph.w / total as f32;
-
-			for (i, c) in cluster.grapheme_indices(true) {
-				let c_start = glyph.start + i;
-				let c_end = glyph.start + i + c.len();
-
-				if (start.line != line_idx || c_end > start.index)
-					&& (end.line != line_idx || c_start < end.index)
-				{
-					range_opt = match range_opt.take() {
-						Some((min, max)) => Some((
-							min.min(c_x),
-							max.max(c_x + c_w),
-						)),
-
-						None => Some((c_x, c_x + c_w)),
-					};
-
-				} else if let Some((min_x, max_x)) = range_opt.take() {
-					let min = start_pos + Vec2::new(min_x, line_top);
-					let max = start_pos + Vec2::new(max_x.max(min_x), line_top + line_height);
-
-					painter.rect(Aabb2{min, max});
-				}
-
-				c_x += c_w;
-			}
-		}
-
-		if run.glyphs.is_empty() && end.line > line_idx {
-			// Highlight all of internal empty lines
-			range_opt = Some((0.0, buffer_width));
-		}
-
-		if let Some((mut min_x, mut max_x)) = range_opt.take() {
-			if end.line > line_idx {
-				// Draw to end of line
-				if run.rtl {
-					min_x = 0.0;
-				} else {
-					max_x = buffer_width;
-				}
-			}
-
-			let min = start_pos + Vec2::new(min_x, line_top);
-			let max = start_pos + Vec2::new(max_x.max(min_x), line_top + line_height);
-
-			painter.rect(Aabb2{min, max});
-		}
+		painter.rect(Aabb2{min, max});
 	}
 
 	// Heavily adapted from cosmic_text::Editor::draw
@@ -305,6 +261,9 @@ impl TextEditWidgetState {
 		if cursor.line != run.line_i {
 			return;
 		}
+
+		// TODO(pat.m): next release of cosmic_text should have an Editor::cursor_position which will mean we can
+		// delete most of this.
 
 		// Search for the index of the glyph after the cursor, or if the cursor is within a cluster
 		// the index of the containing glyph and an approximate offset indicating which grapheme within the cluster.
