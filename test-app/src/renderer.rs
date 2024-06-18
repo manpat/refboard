@@ -10,7 +10,7 @@ pub struct Renderer {
 	framebuffer: wgpu::TextureView,
 
 	// TODO(pat.m): not shared bc of msaa_samples
-	vector_render_pipeline: wgpu::RenderPipeline,
+	render_pipeline: wgpu::RenderPipeline,
 
 
 	vertex_bytes: u64,
@@ -58,7 +58,7 @@ impl Renderer {
 			},
 		};
 
-		let vector_render_pipeline = core.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+		let render_pipeline = core.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
 			label: None,
 			layout: Some(&shared_resources.pipeline_layout),
 			vertex: wgpu::VertexState {
@@ -109,7 +109,7 @@ impl Renderer {
 			surface,
 			surface_config,
 
-			vector_render_pipeline,
+			render_pipeline,
 			framebuffer,
 
 			vertex_bytes: 0,
@@ -262,8 +262,8 @@ impl Renderer {
 		});
 
 		if self.index_bytes > 0 {
-			pass.set_pipeline(&self.vector_render_pipeline);
-			pass.set_bind_group(0, &shared_resources.vector_bind_group, &[]);
+			pass.set_pipeline(&self.render_pipeline);
+			pass.set_bind_group(0, &shared_resources.bind_group, &[]);
 			pass.set_index_buffer(shared_resources.index_buffer.slice(0..self.index_bytes), wgpu::IndexFormat::Uint32);
 			pass.set_vertex_buffer(0, shared_resources.vertex_buffer.slice(0..self.vertex_bytes));
 
@@ -321,7 +321,7 @@ pub struct SharedResources {
 	text_atlas_texture: wgpu::Texture,
 
 	globals_buffer: wgpu::Buffer,
-	vector_bind_group: wgpu::BindGroup,
+	bind_group: wgpu::BindGroup,
 	pipeline_layout: wgpu::PipelineLayout,
 
 	vertex_buffer: wgpu::Buffer,
@@ -418,7 +418,7 @@ impl SharedResources {
 			.. Default::default()
 		});
 
-		let vector_bind_group = core.device.create_bind_group(&wgpu::BindGroupDescriptor {
+		let bind_group = core.device.create_bind_group(&wgpu::BindGroupDescriptor {
 			label: Some("Bind group"),
 			layout: &bind_group_layout,
 			entries: &[
@@ -471,7 +471,7 @@ impl SharedResources {
 			shader_module,
 			text_atlas_texture,
 			globals_buffer,
-			vector_bind_group,
+			bind_group,
 			pipeline_layout,
 			vertex_buffer,
 			index_buffer,
