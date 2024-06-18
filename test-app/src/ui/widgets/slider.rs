@@ -49,23 +49,19 @@ impl Widget for Slider {
 		let bounds = ctx.layout.content_bounds;
 		let half_height = bounds.height() / 2.0;
 
-		let handle_stroke_width = 5.0;
-		let track_width = 12.0;
-		let dot_radius = track_width / 4.0;
-
-		let handle_travel_start = bounds.min.x + handle_stroke_width;
-		let handle_travel_length = bounds.width() - handle_stroke_width * 2.0;
+		let handle_width = 5.0;
+		let track_width = 6.0;
+		
+		let handle_travel_start = bounds.min.x + half_height;
+		let handle_travel_length = bounds.width() - half_height * 2.0;
 
 		state.handle_travel_length = handle_travel_length;
 
 		let handle_pos_x = handle_travel_start + handle_travel_length * self.value;
 
-		let left_center = bounds.min + Vec2::from_y(half_height);
-		let right_center = bounds.max - Vec2::from_y(half_height);
+		let left_center = bounds.min + Vec2::splat(half_height);
+		let right_center = bounds.max - Vec2::splat(half_height);
 		let handle_center = Vec2::new(handle_pos_x, left_center.y);
-
-		let left_stop = Vec2::new(handle_travel_start, left_center.y);
-		let right_stop = Vec2::new(handle_travel_start + handle_travel_length, left_center.y);
 
 		let primary_color = ctx.app_style.resolve_color_role(WidgetColorRole::Primary);
 		let primary_container_color = ctx.app_style.resolve_color_role(WidgetColorRole::SecondaryContainer);
@@ -90,23 +86,19 @@ impl Widget for Slider {
 		ctx.painter.stroke_options.end_cap = lyon::tessellation::LineCap::Butt;
 
 		// Active Track
-		ctx.painter.set_color(active_track_color);
-		ctx.painter.line(left_center, handle_center - Vec2::from_x(handle_stroke_width));
+		if handle_pos_x > left_center.x {
+			ctx.painter.set_color(active_track_color);
+			ctx.painter.line(left_center, handle_center);
+		}
 
 		// Inactive Track
-		ctx.painter.set_color(inactive_track_color);
-		ctx.painter.line(right_center, handle_center + Vec2::from_x(handle_stroke_width));
-
-		// Active Track Stop
-		ctx.painter.set_color(inactive_track_color);
-		ctx.painter.circle(left_stop, dot_radius);
-
-		// Inactive Track Stop
-		ctx.painter.set_color(active_track_color);
-		ctx.painter.circle(right_stop, dot_radius);
+		if handle_pos_x < right_center.x {
+			ctx.painter.set_color(inactive_track_color);
+			ctx.painter.line(right_center, handle_center);
+		}
 
 		// Handle
-		ctx.painter.set_line_width(handle_stroke_width);
+		ctx.painter.set_line_width(handle_width);
 		ctx.painter.stroke_options.start_cap = lyon::tessellation::LineCap::Round;
 		ctx.painter.stroke_options.end_cap = lyon::tessellation::LineCap::Round;
 
